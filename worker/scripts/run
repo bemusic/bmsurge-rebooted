@@ -1,0 +1,3 @@
+#!/bin/bash -e
+mkdir -p tmp/output
+docker run -ti --rm -v "$PWD/src:/usr/src/app/src" -v "$PWD/tmp/output:/data/output" bmsurge-renderer node src/index.js "$@"

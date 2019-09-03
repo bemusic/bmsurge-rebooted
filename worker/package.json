@@ -1,0 +1,20 @@
+{
+  "name": "bemuse-assets-extractor",
+  "version": "0.0.1",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "bemuse-tools": "^45.1.0",
+    "bluebird": "^3.5.5",
+    "bson-objectid": "^1.3.0",
+    "execa": "^2.0.4",
+    "glob": "^7.1.4",
+    "mkdirp": "^0.5.1",
+    "tkt": "2"
+  }
+}

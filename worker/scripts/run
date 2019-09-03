@@ -1,3 +1,10 @@
 #!/bin/bash -e
 mkdir -p tmp/output
-docker run -ti --rm -v "$PWD/src:/usr/src/app/src" -v "$PWD/tmp/output:/data/output" bmsurge-renderer node src/index.js "$@"
+docker run -ti --init --rm \
+  -p 4567:8080 \
+  -v "$PWD/src:/usr/src/app/src" \
+  -v "$PWD/tmp/output:/data/output" \
+  -v "$PWD/private:/data/private" \
+  --env-file private/env \
+  bmsurge-renderer \
+  node src/index.js "$@"

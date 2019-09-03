@@ -25,19 +25,60 @@ cli()
       }
     },
     async args => {
-      return process(args.url, args.output)
+      return render(args.url, args.output)
     }
   )
+  .command('server', 'Starts a rendering server', {}, async args => {
+    const port = +process.env.PORT || 8080
+    const app = require('express')()
+    const log = logger('server')
+    const { Storage } = require('@google-cloud/storage')
+    const storage = new Storage()
+    app.use(require('body-parser').json())
+    app.put('/renders/:operationId', async (req, res, next) => {
+      try {
+        const url = req.body.url
+        if (!/^http/.test(url)) return res.status(400).send('URL must be valid')
+        const operationId = req.params.operationId
+        const opLog = log.child(operationId)
+        opLog.info({ url }, 'Handling request')
+        /** @type {OutputDiagnostics} */
+        const result = { operationId, events: [] }
+        await render(req.body.url, null, result)
+        opLog.info({ result }, 'Render result')
+        const bucketName = process.env.BMSURGE_RENDER_OUTPUT_BUCKET
+        if (result.outFile) {
+          opLog.info('Uploading file')
+          await storage
+            .bucket(bucketName)
+            .upload(result.outFile, { destination: `${operationId}.mp3` })
+          opLog.info('Uploading finish')
+          eventLog(result, 'uploaded')
+        }
+        res.json(result)
+      } catch (err) {
+        next(err)
+      }
+    })
+    app.listen(port, function() {
+      log.info('App is listening on port', port)
+    })
+  })
   .parse()
 
 /**
- * @param {string} url
- * @param {string} outputMp3Path
+ * @typedef {import('./types').OutputDiagnostics} OutputDiagnostics
  */
-async function process(url, outputMp3Path) {
-  const log = logger('process')
+
+/**
+ * @param {string} url
+ * @param {string|null} outputMp3Path
+ * @param {OutputDiagnostics} outputDiagnostics
+ */
+async function render(url, outputMp3Path, outputDiagnostics = { events: [] }) {
+  const log = logger('render')
   const workDir = `/tmp/bmsurge-renderer/${ObjectID.default.generate()}`
-  const outputDiagnostics = {}
+  eventLog(outputDiagnostics, 'render:start')
   try {
     log.info('Using working directory: %s', workDir)
     outputDiagnostics.workingDirectory = workDir
@@ -49,6 +90,7 @@ async function process(url, outputMp3Path) {
     await execLog('wget', [`-O${downloadedFilePath}`, url], {
       timeout: 120000
     })
+    eventLog(outputDiagnostics, 'render:downloaded')
 
     const extractedDir = `${workDir}/extracted`
     log.info('Extracting archive to: %s', extractedDir)
@@ -57,6 +99,7 @@ async function process(url, outputMp3Path) {
       timeout: 60000,
       cwd: extractedDir
     })
+    eventLog(outputDiagnostics, 'render:extracted')
 
     log.info('Removing unrelated files to save space...')
     const allFiles = glob.sync('**/*', {
@@ -69,10 +112,12 @@ async function process(url, outputMp3Path) {
         fs.unlinkSync(`${extractedDir}/${filePath}`)
       }
     }
+    eventLog(outputDiagnostics, 'render:unrelatedFilesRemoved')
 
     log.info('Converting sound files to 44khz')
     const convertedDir = `${workDir}/render/song`
     await prepareSounds(extractedDir, convertedDir)
+    eventLog(outputDiagnostics, 'render:converted')
 
     log.info('Moving chart files')
     const chartFiles = glob.sync('*.{bm[sel],pms,bmson}', {
@@ -88,6 +133,7 @@ async function process(url, outputMp3Path) {
       fs.renameSync(`${extractedDir}/${file}`, target)
       log.debug('Moved to %s', target)
     }
+    eventLog(outputDiagnostics, 'render:chartsMoved')
 
     log.info('Indexing BMS files...')
     await execLog(
@@ -98,6 +144,7 @@ async function process(url, outputMp3Path) {
         cwd: `${workDir}/render`
       }
     )
+    eventLog(outputDiagnostics, 'render:indexed')
 
     const data = JSON.parse(
       fs.readFileSync(`${workDir}/render/index.json`, 'utf8')
@@ -114,6 +161,7 @@ async function process(url, outputMp3Path) {
     charts.sort((a, b) => a.noteCount - b.noteCount)
     const selectedChart = charts[Math.floor((charts.length - 1) / 2)]
     log.info({ selectedChart }, 'Selected chart: %s', selectedChart.file)
+    eventLog(outputDiagnostics, 'render:chartSelected')
 
     const sourceBmsPath = `${workDir}/render/song/${selectedChart.file}`
     const temporaryWavPath = `${workDir}/render.wav`
@@ -124,12 +172,14 @@ async function process(url, outputMp3Path) {
       timeout: 300000,
       cwd: workDir
     })
+    eventLog(outputDiagnostics, 'render:rendered')
 
     log.info('Normalizing...')
     await execLog('wavegain', ['-y', temporaryWavPath], {
       timeout: 15000,
       cwd: workDir
     })
+    eventLog(outputDiagnostics, 'render:normalized')
 
     log.info('Trimming...')
     await execLog(
@@ -145,19 +195,27 @@ async function process(url, outputMp3Path) {
       { cwd: workDir, timeout: 30000 }
     )
     fs.unlinkSync(temporaryWavPath)
+    eventLog(outputDiagnostics, 'render:trimmed')
 
     log.info('Converting to MP3...')
     await execLog('lame', ['-b320', songWavPath, songMp3Path], {
       timeout: 60000
     })
     fs.unlinkSync(songWavPath)
+    eventLog(outputDiagnostics, 'render:encoded')
 
+    outputDiagnostics.outFile = songMp3Path
     if (outputMp3Path) {
       await execLog('mv', [songMp3Path, outputMp3Path], {})
+      outputDiagnostics.outFile = outputMp3Path
     }
   } catch (error) {
     log.error({ err: error })
+    outputDiagnostics.error = String(error && error.stack)
+  } finally {
+    outputDiagnostics.finishedAt = Date.now()
   }
+  return outputDiagnostics
 }
 /**
  *
@@ -247,4 +305,11 @@ async function prepareSounds(src, dest) {
     },
     { concurrency: require('os').cpus().length }
   )
+}
+/**
+ * @param {OutputDiagnostics} outputDiagnostics
+ * @param {string} event
+ */
+function eventLog(outputDiagnostics, event) {
+  outputDiagnostics.events.push({ time: Date.now(), event })
 }

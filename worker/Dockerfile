@@ -47,3 +47,5 @@ COPY package.json /usr/src/app/
 RUN yarn install --frozen-lockfile
 
 ENV LANG C.UTF-8
+COPY src/ /usr/src/app/src/
+CMD ["bash", "-c", "node src/index.js server"]

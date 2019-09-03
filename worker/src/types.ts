@@ -1,6 +1,7 @@
 export type OutputDiagnostics = {
   operationId?: string
   startedAt?: number
+  uploadedAt?: number
   archiveSize?: number
   outSize?: number
   replayGain?: number

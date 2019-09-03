@@ -57,6 +57,7 @@ cli()
 
         const writeStatus = () => {
           res.write(JSON.stringify({ time: Date.now(), ...result }) + '\n')
+          // @ts-ignore
           res.flush()
         }
         writeStatus()
@@ -67,14 +68,13 @@ cli()
         const bucketName = process.env.BMSURGE_RENDER_OUTPUT_BUCKET
         if (result.outFile) {
           opLog.info('Uploading file')
-          await storage
-            .bucket(bucketName)
-            .upload(result.outFile, {
-              destination: `${operationId}.mp3`,
-              resumable: false
-            })
+          await storage.bucket(bucketName).upload(result.outFile, {
+            destination: `${operationId}.mp3`,
+            resumable: false
+          })
           opLog.info('Uploading finish')
           eventLog(result, 'uploaded')
+          result.uploadedAt = Date.now()
         }
         if (result.workingDirectory) {
           rimraf.sync(result.workingDirectory)

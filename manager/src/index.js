@@ -1,20 +1,18 @@
 // @ts-check
 const { cli, logger, invariant } = require('tkt')
 const fs = require('fs')
+const path = require('path')
 require('dotenv').config()
 const { ObjectId, MongoClient } = require('mongodb')
-
+const Bluebird = require('bluebird')
+const axios = require('axios').default
 cli()
   .command(
-    'import <eventId> <file>',
+    'import <file>',
     'Adds files to be processed',
     {
-      eventId: {
-        desc: 'Event ID',
-        type: 'string'
-      },
       file: {
-        desc: 'JSON file of URLs',
+        desc: 'JSON file of URLs, filename should be *.urls.json',
         type: 'string'
       },
       f: {
@@ -23,13 +21,19 @@ cli()
       }
     },
     async args => {
+      const eventId = path.basename(args.file, '.urls.json')
+      invariant(
+        eventId.match(/^[a-z0-9]+$/),
+        'Event ID must be an alphanumeric string; received: %s',
+        eventId
+      )
       const log = logger('import')
       const operations = JSON.parse(fs.readFileSync(args.file, 'utf8')).map(
         url => ({
           updateOne: {
             filter: { url },
             update: {
-              $setOnInsert: { url, eventId: args.eventId, addedAt: new Date() }
+              $setOnInsert: { url, eventId: eventId, addedAt: new Date() }
             },
             upsert: true
           }
@@ -47,6 +51,103 @@ cli()
         } finally {
           client.close()
         }
+      }
+    }
+  )
+  .command(
+    'work',
+    'Invokes the worker to process BMS archives',
+    {},
+    async args => {
+      const log = logger('work')
+      const client = await connectToMongoDB()
+      try {
+        const songsCollection = client.db().collection('songs')
+        const found = await songsCollection
+          .find({ 'renderResult.uploadedAt': { $exists: false } })
+          .toArray()
+        log.info('Found %s songs to work on.', found.length)
+        await Bluebird.map(
+          found,
+          async song => {
+            // @ts-ignore
+            const operationId = String(ObjectId())
+            const songLog = log.child(`${song._id}`)
+            songLog.info('Start operation "%s"', operationId)
+            try {
+              const response = await axios.put(
+                `${process.env.WORKER_URL}/renders/${operationId}`,
+                { url: song.url },
+                {
+                  timeout: 900e3,
+                  responseType: 'text',
+                  transformResponse: undefined
+                }
+              )
+              songLog.info('Operation "%s" finished', operationId)
+              const result = JSON.parse(
+                response.data
+                  .split('\n')
+                  .filter(r => r.trim())
+                  .pop()
+              )
+              await songsCollection.updateOne(
+                { _id: song._id },
+                {
+                  $set: {
+                    renderResult: result,
+                    renderedAt: new Date()
+                  }
+                }
+              )
+            } catch (error) {
+              songLog.error({ err: error }, 'Cannot render!')
+              await songsCollection.updateOne(
+                { _id: song._id },
+                {
+                  $set: {
+                    renderError:
+                      String(error && error.stack) +
+                      (error.response
+                        ? `\nResponse: ${error.response.data}`
+                        : ''),
+                    renderedAt: new Date()
+                  }
+                }
+              )
+            }
+          },
+          { concurrency: 256 }
+        )
+      } finally {
+        client.close()
+      }
+    }
+  )
+  .command(
+    'view',
+    'Prints the URLs of the songs',
+    { eventId: { type: 'string', alias: ['e'] } },
+    async args => {
+      const log = logger('work')
+      const client = await connectToMongoDB()
+      try {
+        const songsCollection = client.db().collection('songs')
+        const filters = {}
+        if (args.eventId) filters.eventId = args.eventId
+        const found = await songsCollection
+          .find({ 'renderResult.uploadedAt': { $exists: true }, ...filters })
+          .toArray()
+        for (const song of found) {
+          console.log(
+            `${process.env.MP3_URL_PATTERN.replace(
+              '%s',
+              song.renderResult.operationId
+            )}`
+          )
+        }
+      } finally {
+        client.close()
       }
     }
   )

@@ -8,6 +8,7 @@ const mkdirp = require('mkdirp')
 const glob = require('glob')
 const path = require('path')
 const Bluebird = require('bluebird')
+const rimraf = require('rimraf')
 
 cli()
   .command(
@@ -25,7 +26,11 @@ cli()
       }
     },
     async args => {
-      return render(args.url, args.output)
+      /** @type {OutputDiagnostics} */
+      const result = { events: [], warnings: [] }
+      const log = logger('render:cli')
+      await render(args.url, args.output, result)
+      log.info({ result }, 'Finished')
     }
   )
   .command('server', 'Starts a rendering server', {}, async args => {
@@ -39,11 +44,24 @@ cli()
       try {
         const url = req.body.url
         if (!/^http/.test(url)) return res.status(400).send('URL must be valid')
+
+        res.set('Content-Type', 'application/x-ndjson')
+        res.flushHeaders()
+
         const operationId = req.params.operationId
         const opLog = log.child(operationId)
         opLog.info({ url }, 'Handling request')
+
         /** @type {OutputDiagnostics} */
-        const result = { operationId, events: [] }
+        const result = { operationId, events: [], warnings: [] }
+
+        const writeStatus = () => {
+          res.write(JSON.stringify({ time: Date.now(), ...result }) + '\n')
+          res.flush()
+        }
+        writeStatus()
+        const interval = setInterval(writeStatus, 5000)
+
         await render(req.body.url, null, result)
         opLog.info({ result }, 'Render result')
         const bucketName = process.env.BMSURGE_RENDER_OUTPUT_BUCKET
@@ -51,11 +69,19 @@ cli()
           opLog.info('Uploading file')
           await storage
             .bucket(bucketName)
-            .upload(result.outFile, { destination: `${operationId}.mp3` })
+            .upload(result.outFile, {
+              destination: `${operationId}.mp3`,
+              resumable: false
+            })
           opLog.info('Uploading finish')
           eventLog(result, 'uploaded')
         }
-        res.json(result)
+        if (result.workingDirectory) {
+          rimraf.sync(result.workingDirectory)
+        }
+        writeStatus()
+        clearInterval(interval)
+        res.end()
       } catch (err) {
         next(err)
       }
@@ -75,7 +101,11 @@ cli()
  * @param {string|null} outputMp3Path
  * @param {OutputDiagnostics} outputDiagnostics
  */
-async function render(url, outputMp3Path, outputDiagnostics = { events: [] }) {
+async function render(
+  url,
+  outputMp3Path,
+  outputDiagnostics = { events: [], warnings: [] }
+) {
   const log = logger('render')
   const workDir = `/tmp/bmsurge-renderer/${ObjectID.default.generate()}`
   eventLog(outputDiagnostics, 'render:start')
@@ -87,10 +117,15 @@ async function render(url, outputMp3Path, outputDiagnostics = { events: [] }) {
     const downloadDir = `${workDir}/downloads`
     mkdirp.sync(downloadDir)
     const downloadedFilePath = `${workDir}/downloads/archive.zip`
-    await execLog('wget', [`-O${downloadedFilePath}`, url], {
-      timeout: 120000
-    })
+    await execLog(
+      'wget',
+      [`-O${downloadedFilePath}`, '--progress=dot:mega', url],
+      {
+        timeout: 120000
+      }
+    )
     eventLog(outputDiagnostics, 'render:downloaded')
+    outputDiagnostics.archiveSize = fs.statSync(downloadedFilePath).size
 
     const extractedDir = `${workDir}/extracted`
     log.info('Extracting archive to: %s', extractedDir)
@@ -100,6 +135,7 @@ async function render(url, outputMp3Path, outputDiagnostics = { events: [] }) {
       cwd: extractedDir
     })
     eventLog(outputDiagnostics, 'render:extracted')
+    rimraf.sync(downloadDir)
 
     log.info('Removing unrelated files to save space...')
     const allFiles = glob.sync('**/*', {
@@ -116,7 +152,7 @@ async function render(url, outputMp3Path, outputDiagnostics = { events: [] }) {
 
     log.info('Converting sound files to 44khz')
     const convertedDir = `${workDir}/render/song`
-    await prepareSounds(extractedDir, convertedDir)
+    await prepareSounds(extractedDir, convertedDir, outputDiagnostics)
     eventLog(outputDiagnostics, 'render:converted')
 
     log.info('Moving chart files')
@@ -134,6 +170,7 @@ async function render(url, outputMp3Path, outputDiagnostics = { events: [] }) {
       log.debug('Moved to %s', target)
     }
     eventLog(outputDiagnostics, 'render:chartsMoved')
+    rimraf.sync(extractedDir)
 
     log.info('Indexing BMS files...')
     await execLog(
@@ -155,6 +192,7 @@ async function render(url, outputMp3Path, outputDiagnostics = { events: [] }) {
     }
     const charts = song.charts
     log.info('Found %s charts', charts.length)
+    outputDiagnostics.availableCharts = charts.map(c => c.file)
     if (!charts.length) {
       throw new Error('No usable chart found')
     }
@@ -162,6 +200,7 @@ async function render(url, outputMp3Path, outputDiagnostics = { events: [] }) {
     const selectedChart = charts[Math.floor((charts.length - 1) / 2)]
     log.info({ selectedChart }, 'Selected chart: %s', selectedChart.file)
     eventLog(outputDiagnostics, 'render:chartSelected')
+    outputDiagnostics.selectedChart = selectedChart
 
     const sourceBmsPath = `${workDir}/render/song/${selectedChart.file}`
     const temporaryWavPath = `${workDir}/render.wav`
@@ -173,13 +212,24 @@ async function render(url, outputMp3Path, outputDiagnostics = { events: [] }) {
       cwd: workDir
     })
     eventLog(outputDiagnostics, 'render:rendered')
+    rimraf.sync(`${workDir}/render`)
 
     log.info('Normalizing...')
-    await execLog('wavegain', ['-y', temporaryWavPath], {
-      timeout: 15000,
-      cwd: workDir
-    })
+    const normalizationResult = await execLog(
+      'wavegain',
+      ['-y', temporaryWavPath],
+      {
+        timeout: 15000,
+        cwd: workDir
+      }
+    )
     eventLog(outputDiagnostics, 'render:normalized')
+    const replayGainMatch = /Applying Gain of\s+(\S+)\s+dB/.exec(
+      normalizationResult.stderr
+    )
+    if (replayGainMatch) {
+      outputDiagnostics.replayGain = +replayGainMatch[1]
+    }
 
     log.info('Trimming...')
     await execLog(
@@ -203,7 +253,7 @@ async function render(url, outputMp3Path, outputDiagnostics = { events: [] }) {
     })
     fs.unlinkSync(songWavPath)
     eventLog(outputDiagnostics, 'render:encoded')
-
+    outputDiagnostics.outSize = fs.statSync(songMp3Path).size
     outputDiagnostics.outFile = songMp3Path
     if (outputMp3Path) {
       await execLog('mv', [songMp3Path, outputMp3Path], {})
@@ -248,7 +298,12 @@ function execLog(command, args, options) {
   return process
 }
 
-async function prepareSounds(src, dest) {
+/**
+ * @param {string} src
+ * @param {string} dest
+ * @param {OutputDiagnostics} outputDiagnostics
+ */
+async function prepareSounds(src, dest, outputDiagnostics) {
   const log = logger('prepareSounds')
   log.info({ src, dest }, 'Preparing sounds')
   mkdirp.sync(dest)
@@ -259,6 +314,7 @@ async function prepareSounds(src, dest) {
     cwd: src
   })
   log.info('Found %d sound file(s)', sounds.length)
+  log.info('Available CPUs', require('os').cpus().length)
 
   // Convert sounds
   let soundsConverted = 0
@@ -270,6 +326,10 @@ async function prepareSounds(src, dest) {
       let stderr = ''
       try {
         if (fs.statSync(sourceFile).size === 0) {
+          warningLog(
+            outputDiagnostics,
+            `Found blank sound file at '${sourceFile}'`
+          )
           resultLogText = 'skip; blank file'
           return
         }
@@ -284,6 +344,10 @@ async function prepareSounds(src, dest) {
         stderr = result.stderr
         resultLogText = 'ok'
       } catch (e) {
+        warningLog(
+          outputDiagnostics,
+          `Cannot convert sound file '${sourceFile}': ${e}`
+        )
         log.warn(
           "[CONVERSION WARNING] prepare phase: Cannot convert sound file '%s': %s",
           sourceFile,
@@ -292,19 +356,21 @@ async function prepareSounds(src, dest) {
         resultLogText = 'error'
         if (e.stderr) stderr = e.stderr
       } finally {
-        log.info(
-          stderr ? { stderr } : {},
+        const message = require('util').format(
           'Converted audio (%d/%d) "%s" [%s]',
           ++soundsConverted,
           sounds.length,
           sound,
           resultLogText
         )
+        log.debug(stderr ? { stderr } : {}, message)
+        outputDiagnostics.soundConversationStatus = message
         fs.unlinkSync(sourceFile)
       }
     },
-    { concurrency: require('os').cpus().length }
+    { concurrency: 1 }
   )
+  outputDiagnostics.soundConversationStatus = 'All done'
 }
 /**
  * @param {OutputDiagnostics} outputDiagnostics
@@ -312,4 +378,12 @@ async function prepareSounds(src, dest) {
  */
 function eventLog(outputDiagnostics, event) {
   outputDiagnostics.events.push({ time: Date.now(), event })
+}
+
+/**
+ * @param {OutputDiagnostics} outputDiagnostics
+ * @param {string} message
+ */
+function warningLog(outputDiagnostics, message) {
+  outputDiagnostics.warnings.push({ time: Date.now(), message })
 }

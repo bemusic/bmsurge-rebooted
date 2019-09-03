@@ -5,6 +5,6 @@ docker run -ti --init --rm \
   -v "$PWD/src:/usr/src/app/src" \
   -v "$PWD/tmp/output:/data/output" \
   -v "$PWD/private:/data/private" \
-  --env-file private/env \
+  --env-file .env \
   bmsurge-renderer \
   node src/index.js "$@"

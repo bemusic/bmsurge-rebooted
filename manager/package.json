@@ -1,0 +1,10 @@
+{
+  "dependencies": {
+    "dotenv": "^8.1.0",
+    "mongodb": "^3.3.2",
+    "tkt": "^2.0.0"
+  },
+  "devDependencies": {
+    "@types/mongodb": "^3.3.1"
+  }
+}

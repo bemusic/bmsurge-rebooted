@@ -15,9 +15,22 @@ MP3_URL_PATTERN=https://<domain>/<path>/%s.mp3
 yarn
 ```
 
+## Preparing a BMS event for rendering
+
+Create a ZIP file for each song in the event. The ZIP file should meet the
+following requirements:
+
+1. Filenames must be encoded in UTF-8.
+
+2. Files must reside at the root of the ZIP file. They may not be inside a
+   directory.
+
+Upload all the ZIP files to a web server where it can be downloaded by the
+[worker](../worker).
+
 ## Importing URLs
 
-Create a file containing list URLs to the BMS packages to render, name it as
+Create a file containing list URLs to the ZIP files to render, name it as
 `<eventId>.urls.json`. For example, `g2r2018.urls.json` may look like this:
 
 ```json
@@ -41,4 +54,17 @@ Then, import the URLs into the database using:
 node src/index.js import <path/to/event>.urls.json
 ```
 
-The above command will do a dry run. To confirm the changes, add `-f`.
+The above command will do a dry run. To confirm the changes, add `-f`. This will
+import the songs into the MongoDB database.
+
+## Render the BMS songs to MP3
+
+```
+node src/index.js work
+```
+
+This will read from the database to find all songs that need to be rendered,
+then it will invoke the [worker](../worker) service that has been deployed to
+Google Cloud Run. Thanks to Google Cloud Run, we can render hundreds of songs
+simultaneously. From my test 1,000 songs can be rendered in less than 30
+minutes!

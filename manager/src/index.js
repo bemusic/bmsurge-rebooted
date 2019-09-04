@@ -61,14 +61,20 @@ cli()
   .command(
     'work',
     'Invokes the worker to process BMS archives',
-    {},
+    {
+      retry: { type: 'boolean', desc: 'Retry previously failed archives' }
+    },
     async args => {
       const log = logger('work')
       const client = await connectToMongoDB()
       try {
         const songsCollection = client.db().collection('songs')
         const found = await songsCollection
-          .find({ 'renderResult.uploadedAt': { $exists: false } })
+          .find(
+            args.retry
+              ? { 'renderResult.uploadedAt': { $exists: false } }
+              : { renderedAt: { $exists: false } }
+          )
           .toArray()
         log.info('Found %s songs to work on.', found.length)
         await Bluebird.map(

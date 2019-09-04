@@ -9,19 +9,21 @@ exports.generatePlaylist = async function generatePlaylist(client, args = {}) {
   const found = await songsCollection
     .find({ 'renderResult.uploadedAt': { $exists: true }, ...filters })
     .toArray()
-  console.log('#EXTM3U')
+  const out = []
+  out.push('#EXTM3U')
   for (const song of found) {
     const chart = song.renderResult.selectedChart
-    console.log(
+    out.push(
       `#EXTINF:${Math.floor(chart.duration)},[${chart.info.genre}] ${
         chart.info.artist
-      } - ${chart.info.title}`
+      } - ${chart.info.title} #${song.eventId}`
     )
-    console.log(
+    out.push(
       `${process.env.MP3_URL_PATTERN.replace(
         '%s',
         song.renderResult.operationId
       )}`
     )
   }
+  return out.join('\n')
 }

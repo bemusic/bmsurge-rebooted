@@ -166,6 +166,14 @@ cli()
         next(e)
       }
     })
+    app.get('/playlist.m3u', async (req, res, next) => {
+      try {
+        res.set('Content-Type', 'application/vnd.apple.mpegurl; charset=utf-8')
+        res.send(await generatePlaylist(client, req.query))
+      } catch (e) {
+        next(e)
+      }
+    })
     app.listen(+process.env.PORT || 8080)
   })
   .parse()

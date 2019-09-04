@@ -33,7 +33,7 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="song in report.songs" :key="song._id">
+              <tr v-for="song in report.songs" :key="song._id" @click="songClick(song)">
                 <td>{{ song.eventId }}</td>
                 <td>{{ song.packageFile }}</td>
                 <td>{{ song.chart && song.chart.info && song.chart.info.genre }}</td>
@@ -64,12 +64,15 @@
           }
         },
         methods: {
-          statusBadge(status){
+          statusBadge(status) {
             return {
               done: 'badge-success',
               error: 'badge-danger',
               pending: 'badge-secondary',
             }[status]
+          },
+          songClick(song) {
+            console.log(JSON.parse(JSON.stringify(song)))
           }
         }
       })

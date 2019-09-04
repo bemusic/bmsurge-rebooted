@@ -15,13 +15,19 @@ exports.generateReport = async function generateReport(client) {
   return {
     events,
     songs: songs.map(s => {
+      const renderResult = s.renderResult
       const status =
-        s.renderResult && s.renderResult.uploadedAt
+        renderResult && renderResult.uploadedAt
           ? 'done'
-          : s.renderResult || s.renderError
+          : renderResult || s.renderError
           ? 'error'
           : 'pending'
-      const selectedChart = s.renderResult && s.renderResult.selectedChart
+      const selectedChart = renderResult && renderResult.selectedChart
+      const offset = renderResult
+        ? (renderResult.wavSizeBeforeTrim -
+            renderResult.wavSizeAfterTrimStart) /
+            (44100 * 2 * 2) || 0
+        : 0
       return {
         _id: s._id,
         eventId: s.eventId,
@@ -30,7 +36,11 @@ exports.generateReport = async function generateReport(client) {
         status,
         packageFile: decodeURIComponent(s.url.split('/').pop()),
         chart: selectedChart,
-        operationId: s.renderResult && s.renderResult.operationId
+        md5s: ((renderResult && renderResult.availableCharts) || []).map(
+          c => c.md5
+        ),
+        operationId: renderResult && renderResult.operationId,
+        offset: offset
       }
     })
   }

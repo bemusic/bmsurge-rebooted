@@ -15,4 +15,7 @@ export type OutputDiagnostics = {
   selectedChart?: any
   availableCharts?: string[]
   soundConversationStatus?: string
+  wavSizeBeforeTrim?: number
+  wavSizeAfterTrimStart?: number
+  wavSizeAfterTrimEnd?: number
 }

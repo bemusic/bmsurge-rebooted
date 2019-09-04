@@ -35,7 +35,7 @@ RUN wget https://launchpad.net/~stefanobalocco/+archive/ubuntu/multimedia/+files
   rm -f wavegain_1.3.1-1~xenial1_amd64.deb
 
 # Install bms-renderer
-RUN npm i -g bms-renderer@3.0.0-0 --unsafe
+RUN npm i -g bms-renderer@3.0.0 --unsafe
 
 # Install bmsampler
 COPY --from=bmsampler-builder /usr/bin/bmsampler /usr/bin/bmsampler

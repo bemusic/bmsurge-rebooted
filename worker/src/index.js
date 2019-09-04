@@ -217,7 +217,7 @@ async function render(
     log.info('Rendering "%s" to "%s"...', sourceBmsPath, temporaryWavPath)
     const songWavPath = `${workDir}/song.wav`
     const songMp3Path = `${workDir}/song.mp3`
-    await execLog('bms-renderer', [sourceBmsPath, temporaryWavPath], {
+    await execLog('bms-renderer', ['--full', sourceBmsPath, temporaryWavPath], {
       timeout: 300000,
       cwd: workDir
     })
@@ -242,20 +242,42 @@ async function render(
       outputDiagnostics.replayGain = +replayGainMatch[1]
     }
 
-    log.info('Trimming...')
+    log.info('Coverting to 16bit...')
+    const bitcrushedWavPath = `${workDir}/render16bit.wav`
+    await execLog('sox', [temporaryWavPath, '-b', '16', bitcrushedWavPath], {
+      cwd: workDir,
+      timeout: 30000
+    })
+    outputDiagnostics.wavSizeBeforeTrim = fs.statSync(bitcrushedWavPath).size
+    fs.unlinkSync(temporaryWavPath)
+
+    log.info('Trimming start of audio...')
+    const trimStartWavPath = `${workDir}/render-trimmed.wav`
+    await execLog(
+      'sox',
+      [bitcrushedWavPath, trimStartWavPath, 'silence', '1', '0', '0.1%'],
+      {
+        cwd: workDir,
+        timeout: 30000
+      }
+    )
+    outputDiagnostics.wavSizeAfterTrimStart = fs.statSync(trimStartWavPath).size
+    fs.unlinkSync(bitcrushedWavPath)
+
+    log.info('Trimming end of audio...')
     await execLog(
       'sox',
       [
-        temporaryWavPath,
-        ...['-b', '16', songWavPath],
-        ...['silence', '1', '0', '0.1%'],
+        trimStartWavPath,
+        songWavPath,
         'reverse',
         ...['silence', '1', '0', '0.1%'],
         'reverse'
       ],
       { cwd: workDir, timeout: 30000 }
     )
-    fs.unlinkSync(temporaryWavPath)
+    outputDiagnostics.wavSizeAfterTrimEnd = fs.statSync(songWavPath).size
+    fs.unlinkSync(trimStartWavPath)
     eventLog(outputDiagnostics, 'render:trimmed')
 
     log.info('Converting to MP3...')

@@ -6,6 +6,7 @@ const { ObjectId, MongoClient } = require('mongodb')
 const Bluebird = require('bluebird')
 const axios = require('axios').default
 const uuidv4 = require('uuid/v4')
+const { generateReport } = require('./Reporting')
 
 require('dotenv').config()
 cli()
@@ -160,6 +161,30 @@ cli()
       }
     }
   )
+  .command('report', 'Generates a report', {}, async args => {
+    const client = await connectToMongoDB()
+    try {
+      const report = await generateReport(client)
+      console.log(JSON.stringify(report, null, 2))
+    } finally {
+      client.close()
+    }
+  })
+  .command('server', 'Runs a server', {}, async args => {
+    const client = await connectToMongoDB()
+    const express = require('express')
+    const app = express()
+    app.use(express.static(__dirname + '/../static'))
+    app.get('/report.json', async (req, res, next) => {
+      try {
+        const report = await generateReport(client)
+        res.json(report)
+      } catch (e) {
+        next(e)
+      }
+    })
+    app.listen(+process.env.PORT || 8080)
+  })
   .parse()
 
 async function connectToMongoDB() {

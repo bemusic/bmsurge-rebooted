@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, shrink-to-fit=no"
+    />
+    <title>Be-Music Surge Songlist</title>
+    <link
+      rel="stylesheet"
+      href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css"
+      integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T"
+      crossorigin="anonymous"
+    />
+  </head>
+  <body>
+    <div id="app">
+      <nav class="navbar navbar-expand-md navbar-dark bg-dark mb-4">
+        <a class="navbar-brand" href="/">Be-Music Surge</a>
+      </nav>
+      <main role="main" class="container-fluid">
+        <template v-if="report">
+          <table class="table table-sm">
+            <thead>
+              <tr>
+                <th scope="col">Event</th>
+                <th scope="col">File</th>
+                <th scope="col">Genre</th>
+                <th scope="col">Title</th>
+                <th scope="col">Artist</th>
+                <th scope="col">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="song in report.songs" :key="song._id">
+                <td>{{ song.eventId }}</td>
+                <td>{{ song.packageFile }}</td>
+                <td>{{ song.chart && song.chart.info && song.chart.info.genre }}</td>
+                <td>{{ song.chart && song.chart.info && song.chart.info.title }}</td>
+                <td>{{ song.chart && song.chart.info && song.chart.info.artist }}</td>
+                <td><span class="badge" :class="statusBadge(song.status)">{{song.status}}</span</td>
+              </tr>
+            </tbody>
+          </table>
+        </template>
+        <div v-else>Loading report...</div>
+      </main>
+    </div>
+
+    <script src="https://unpkg.com/vue@2.6.10/dist/vue.js"></script>
+    <script>
+      new Vue({
+        el: '#app',
+        data: {
+          report: null
+        },
+        async mounted() {
+          try {
+            const report = await fetch('/report.json').then(r => r.json())
+            this.report = report
+          } catch (e) {
+            alert(e)
+          }
+        },
+        methods: {
+          statusBadge(status){
+            return {
+              done: 'badge-success',
+              error: 'badge-danger',
+              pending: 'badge-secondary',
+            }[status]
+          }
+        }
+      })
+    </script>
+  </body>
+</html>

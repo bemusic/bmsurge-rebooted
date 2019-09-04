@@ -40,7 +40,13 @@ exports.generateReport = async function generateReport(client) {
           c => c.md5
         ),
         operationId: renderResult && renderResult.operationId,
-        offset: offset
+        offset: offset,
+        timeRange: renderResult
+          ? (() => {
+              const events = renderResult.events
+              return [events[0].time, events[events.length - 1].time]
+            })()
+          : undefined
       }
     })
   }

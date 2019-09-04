@@ -2,10 +2,12 @@
 const { cli, logger, invariant } = require('tkt')
 const fs = require('fs')
 const path = require('path')
-require('dotenv').config()
 const { ObjectId, MongoClient } = require('mongodb')
 const Bluebird = require('bluebird')
 const axios = require('axios').default
+const uuidv4 = require('uuid/v4')
+
+require('dotenv').config()
 cli()
   .command(
     'import <file>',
@@ -71,7 +73,7 @@ cli()
           found,
           async song => {
             // @ts-ignore
-            const operationId = String(ObjectId())
+            const operationId = uuidv4()
             const songLog = log.child(`${song._id}`)
             songLog.info('Start operation "%s"', operationId)
             try {
@@ -117,7 +119,7 @@ cli()
               )
             }
           },
-          { concurrency: 256 }
+          { concurrency: 128 }
         )
       } finally {
         client.close()

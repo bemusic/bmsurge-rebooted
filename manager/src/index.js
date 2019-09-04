@@ -2,11 +2,12 @@
 const { cli, logger, invariant } = require('tkt')
 const fs = require('fs')
 const path = require('path')
-const { ObjectId, MongoClient } = require('mongodb')
+const { MongoClient } = require('mongodb')
 const Bluebird = require('bluebird')
 const axios = require('axios').default
 const uuidv4 = require('uuid/v4')
 const { generateReport } = require('./Reporting')
+const { generatePlaylist } = require('./Playlist')
 
 require('dotenv').config()
 cli()
@@ -130,32 +131,14 @@ cli()
   .command(
     'playlist',
     'Prints the URLs of the songs as an M3U playlist',
-    { eventId: { type: 'string', alias: ['e'] } },
+    {
+      eventId: { type: 'string', alias: ['e'], description: 'Filter by event' }
+    },
     async args => {
       const log = logger('work')
       const client = await connectToMongoDB()
       try {
-        const songsCollection = client.db().collection('songs')
-        const filters = {}
-        if (args.eventId) filters.eventId = args.eventId
-        const found = await songsCollection
-          .find({ 'renderResult.uploadedAt': { $exists: true }, ...filters })
-          .toArray()
-        console.log('#EXTM3U')
-        for (const song of found) {
-          const chart = song.renderResult.selectedChart
-          console.log(
-            `#EXTINF:${Math.floor(chart.duration)},[${chart.info.genre}] ${
-              chart.info.artist
-            } - ${chart.info.title}`
-          )
-          console.log(
-            `${process.env.MP3_URL_PATTERN.replace(
-              '%s',
-              song.renderResult.operationId
-            )}`
-          )
-        }
+        console.log(await generatePlaylist(client, args))
       } finally {
         client.close()
       }

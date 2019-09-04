@@ -68,3 +68,11 @@ then it will invoke the [worker](../worker) service that has been deployed to
 Google Cloud Run. Thanks to Google Cloud Run, we can render hundreds of songs
 simultaneously. From my test 1,000 songs can be rendered in less than 30
 minutes!
+
+## Web-based dashboard
+
+```
+env PORT=8082 node src/index.js server
+```
+
+This will start a web server that displays the dashboard.

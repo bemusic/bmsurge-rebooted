@@ -125,8 +125,8 @@ cli()
     }
   )
   .command(
-    'view',
-    'Prints the URLs of the songs',
+    'playlist',
+    'Prints the URLs of the songs as an M3U playlist',
     { eventId: { type: 'string', alias: ['e'] } },
     async args => {
       const log = logger('work')
@@ -138,7 +138,14 @@ cli()
         const found = await songsCollection
           .find({ 'renderResult.uploadedAt': { $exists: true }, ...filters })
           .toArray()
+        console.log('#EXTM3U')
         for (const song of found) {
+          const chart = song.renderResult.selectedChart
+          console.log(
+            `#EXTINF:${Math.floor(chart.duration)},[${chart.info.genre}] ${
+              chart.info.artist
+            } - ${chart.info.title}`
+          )
           console.log(
             `${process.env.MP3_URL_PATTERN.replace(
               '%s',

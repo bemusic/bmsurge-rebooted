@@ -3,6 +3,7 @@ export type OutputDiagnostics = {
   startedAt?: number
   uploadedAt?: number
   archiveSize?: number
+  wavSize?: number
   outSize?: number
   replayGain?: number
   workingDirectory?: string

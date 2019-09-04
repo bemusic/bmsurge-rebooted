@@ -9,6 +9,7 @@ const glob = require('glob')
 const path = require('path')
 const Bluebird = require('bluebird')
 const rimraf = require('rimraf')
+const isUtf8 = require('isutf8')
 
 cli()
   .command(
@@ -160,14 +161,18 @@ async function render(
       nocase: true,
       cwd: extractedDir
     })
-    for (const file of chartFiles) {
-      const extname = path.extname(file)
-      const target = `${convertedDir}/${path.basename(
-        file,
-        extname
-      )}.sjis${extname}`
-      fs.renameSync(`${extractedDir}/${file}`, target)
-      log.debug('Moved to %s', target)
+    const reverseFilenameMap = new Map()
+    for (const sourceName of chartFiles) {
+      const sourceFilepath = `${extractedDir}/${sourceName}`
+      const extname = path.extname(sourceName)
+      let targetName = path.basename(sourceName)
+      if (!isUtf8(fs.readFileSync(sourceFilepath))) {
+        targetName = `${path.basename(sourceName, extname)}.sjis${extname}`
+      }
+      reverseFilenameMap.set(targetName, sourceName)
+      const targetFilepath = `${convertedDir}/${targetName}`
+      fs.renameSync(sourceFilepath, targetFilepath)
+      log.debug('Moved to %s', targetFilepath)
     }
     eventLog(outputDiagnostics, 'render:chartsMoved')
     rimraf.sync(extractedDir)
@@ -190,9 +195,14 @@ async function render(
     if (!song) {
       throw new Error('No song found')
     }
+    const serializeChart = chart => ({
+      ...chart,
+      file: reverseFilenameMap.get(chart.file) || chart.file,
+      fileSize: fs.statSync(`${workDir}/render/song/${chart.file}`).size
+    })
     const charts = song.charts
     log.info('Found %s charts', charts.length)
-    outputDiagnostics.availableCharts = charts.map(c => c.file)
+    outputDiagnostics.availableCharts = charts.map(serializeChart)
     if (!charts.length) {
       throw new Error('No usable chart found')
     }
@@ -200,7 +210,7 @@ async function render(
     const selectedChart = charts[Math.floor((charts.length - 1) / 2)]
     log.info({ selectedChart }, 'Selected chart: %s', selectedChart.file)
     eventLog(outputDiagnostics, 'render:chartSelected')
-    outputDiagnostics.selectedChart = selectedChart
+    outputDiagnostics.selectedChart = serializeChart(selectedChart)
 
     const sourceBmsPath = `${workDir}/render/song/${selectedChart.file}`
     const temporaryWavPath = `${workDir}/render.wav`
@@ -212,6 +222,7 @@ async function render(
       cwd: workDir
     })
     eventLog(outputDiagnostics, 'render:rendered')
+    outputDiagnostics.wavSize = fs.statSync(temporaryWavPath).size
     rimraf.sync(`${workDir}/render`)
 
     log.info('Normalizing...')

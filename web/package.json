@@ -1,6 +1,7 @@
 {
   "devDependencies": {},
   "dependencies": {
-    "mongodb": "^3.3.2"
+    "mongodb": "^3.3.2",
+    "tkt": "^2.0.0"
   }
 }

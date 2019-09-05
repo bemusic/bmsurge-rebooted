@@ -179,6 +179,8 @@ cli()
             genre: chart.info.genre,
             title: chart.info.title,
             artist: chart.info.artist,
+            md5: chart.md5,
+            duration: s.renderResult.wavSizeAfterTrimEnd / (44100 * 2 * 2),
             event: s.eventId
           }
         })

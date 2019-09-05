@@ -1,6 +1,9 @@
 const { logger, invariant } = require('tkt')
 const { MongoClient } = require('mongodb')
 
+let connection
+let songCache
+
 // Docs on event and context https://www.netlify.com/docs/functions/#the-handler-method
 exports.handler = async (event, context) => {
   const log = logger('handler')
@@ -19,9 +22,11 @@ exports.handler = async (event, context) => {
     }
     const client = await connectToMongoDB()
     const songsCollection = client.db().collection('songs')
-    const songs = await songsCollection
-      .find({ 'renderResult.uploadedAt': { $exists: true } })
-      .toArray()
+    const songs =
+      songCache ||
+      (songCache = await songsCollection
+        .find({ 'renderResult.uploadedAt': { $exists: true } })
+        .toArray())
     const random = Math.floor(Math.random() * songs.length)
     const song = songs[random]
     const chart = song.renderResult.selectedChart
@@ -45,6 +50,9 @@ exports.handler = async (event, context) => {
 }
 
 async function connectToMongoDB() {
+  if (connection) {
+    return connection
+  }
   const log = logger('mongodb')
   log.info('Connecting to MongoDB...')
   const client = new MongoClient(
@@ -53,5 +61,6 @@ async function connectToMongoDB() {
   )
   await client.connect()
   log.info('Connected to MongoDB!')
+  connection = client
   return client
 }

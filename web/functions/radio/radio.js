@@ -1,7 +1,6 @@
 const { logger, invariant } = require('tkt')
-const { MongoClient } = require('mongodb')
+const axios = require('axios')
 
-let connection
 let songCache
 
 // Docs on event and context https://www.netlify.com/docs/functions/#the-handler-method
@@ -36,43 +35,18 @@ exports.handler = async (event, context) => {
 }
 
 async function getSong(_event) {
-  const client = await connectToMongoDB()
-  const songsCollection = client.db().collection('songs')
   const songs =
-    songCache ||
-    (songCache = await songsCollection
-      .find({ 'renderResult.uploadedAt': { $exists: true } })
-      .toArray())
+    songCache || (songCache = (await axios.get(process.env.SONGLIST_URL)).data)
   const random = Math.floor(Math.random() * songs.length)
   const song = songs[random]
-  const chart = song.renderResult.selectedChart
   return {
     statusCode: 200,
     headers: {
       'Content-Type': 'application/json;charset=utf-8'
     },
     body: JSON.stringify({
-      url: `${process.env.MP3_URL_PATTERN.replace(
-        '%s',
-        song.renderResult.operationId
-      )}`,
-      streamTitle: `${chart.info.artist} - ${chart.info.title}`
+      url: `${process.env.MP3_URL_PATTERN.replace('%s', song.songId)}`,
+      streamTitle: `${song.artist} - ${song.title}`
     })
   }
-}
-
-async function connectToMongoDB() {
-  if (connection) {
-    return connection
-  }
-  const log = logger('mongodb')
-  log.info('Connecting to MongoDB...')
-  const client = new MongoClient(
-    process.env.MONGO_URL ||
-      invariant(false, 'Missing environment variable: MONGO_URL')
-  )
-  await client.connect()
-  log.info('Connected to MongoDB!')
-  connection = client
-  return client
 }

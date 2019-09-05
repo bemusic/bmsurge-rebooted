@@ -141,7 +141,6 @@ cli()
       eventId: { type: 'string', alias: ['e'], description: 'Filter by event' }
     },
     async args => {
-      const log = logger('work')
       const client = await connectToMongoDB()
       try {
         console.log(await generatePlaylist(client, args))
@@ -159,6 +158,45 @@ cli()
       client.close()
     }
   })
+  .command(
+    'export-songlist',
+    'Export the songlist',
+    { output: { alias: ['o'], type: 'string', demand: true } },
+    async args => {
+      const log = logger('export-songlist')
+      const client = await connectToMongoDB()
+      try {
+        const songs = await client
+          .db()
+          .collection('songs')
+          .find({ 'renderResult.uploadedAt': { $exists: true } })
+          .toArray()
+        const playlist = songs.map(s => {
+          const chart = s.renderResult.selectedChart
+          return {
+            songId: s._id,
+            fileId: s.renderResult.operationId,
+            genre: chart.info.genre,
+            title: chart.info.title,
+            artist: chart.info.artist,
+            event: s.eventId
+          }
+        })
+        const result = Buffer.from(
+          '[' + playlist.map(s => '\n  ' + JSON.stringify(s)).join(',') + '\n]'
+        )
+        fs.writeFileSync(args.output, result)
+        log.info(
+          'Exported %s songs to "%s" (%s bytes)',
+          songs.length,
+          args.output,
+          result.length
+        )
+      } finally {
+        client.close()
+      }
+    }
+  )
   .command('server', 'Runs a server', {}, async args => {
     const client = await connectToMongoDB()
     const express = require('express')

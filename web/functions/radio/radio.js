@@ -4,22 +4,18 @@ const { MongoClient } = require('mongodb')
 // Docs on event and context https://www.netlify.com/docs/functions/#the-handler-method
 exports.handler = async (event, context) => {
   const log = logger('handler')
-  return {
-    statusCode: 200,
-    headers: {
-      'Content-Type': 'application/json;charset=utf-8'
-    },
-    body: JSON.stringify(event)
-  }
   try {
-    const body = JSON.parse(event.body)
-    const apiKey = body.apiKey
-    if (
-      apiKey !==
-      (process.env.API_KEY ||
-        invariant(false, 'Missing API_KEY environment variable'))
-    ) {
-      throw new Error('Invalid apiKey provided')
+    const expectedApiKey =
+      process.env.API_KEY ||
+      invariant(false, 'Missing API_KEY environment variable')
+    const expectedAuth = `Basic ${Buffer.from(`api:${expectedApiKey}`).toString(
+      'base64'
+    )}`
+    if (event.headers['authorization'] !== expectedAuth) {
+      return {
+        statusCode: 401,
+        body: 'Unauthorized'
+      }
     }
     const client = await connectToMongoDB()
     const songsCollection = client.db().collection('songs')

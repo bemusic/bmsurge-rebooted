@@ -48,7 +48,8 @@ async function getSong(_event) {
     },
     body: JSON.stringify({
       url: `${process.env.MP3_URL_PATTERN.replace('%s', song.fileId)}`,
-      streamTitle: `[${song.genre}] ${song.artist} - ${song.title} [#${song.event}]`
+      streamTitle: `[${song.genre}] ${song.artist} - ${song.title} [#${song.event}]`,
+      info: { song }
     })
   }
 }

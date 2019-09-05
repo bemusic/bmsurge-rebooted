@@ -1,0 +1,5 @@
+[build]
+  base = "web/"
+  publish = "public/"
+  command = "echo '...'"
+  functions = "web/functions/"

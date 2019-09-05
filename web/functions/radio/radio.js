@@ -64,6 +64,7 @@ async function getAllSongs() {
   }
   songCache = (await axios.get(process.env.SONGLIST_URL)).data
   songCacheExpires = Date.now() + 300e3
+  return songCache
 }
 
 async function putSong(_event) {

@@ -22,6 +22,8 @@ exports.handler = async (event, context) => {
     switch (event.path) {
       case '/.netlify/functions/radio/getSong':
         return await getSong(event)
+      case '/.netlify/functions/radio/putSong':
+        return await putSong(event)
       default:
         return {
           statusCode: 404,
@@ -47,6 +49,18 @@ async function getSong(_event) {
     body: JSON.stringify({
       url: `${process.env.MP3_URL_PATTERN.replace('%s', song.fileId)}`,
       streamTitle: `${song.artist} - ${song.title}`
+    })
+  }
+}
+
+async function putSong(_event) {
+  return {
+    statusCode: 200,
+    headers: {
+      'Content-Type': 'application/json;charset=utf-8'
+    },
+    body: JSON.stringify({
+      ok: 'will implement later'
     })
   }
 }

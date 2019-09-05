@@ -20,32 +20,44 @@ exports.handler = async (event, context) => {
         body: 'Unauthorized'
       }
     }
-    const client = await connectToMongoDB()
-    const songsCollection = client.db().collection('songs')
-    const songs =
-      songCache ||
-      (songCache = await songsCollection
-        .find({ 'renderResult.uploadedAt': { $exists: true } })
-        .toArray())
-    const random = Math.floor(Math.random() * songs.length)
-    const song = songs[random]
-    const chart = song.renderResult.selectedChart
-    return {
-      statusCode: 200,
-      headers: {
-        'Content-Type': 'application/json;charset=utf-8'
-      },
-      body: JSON.stringify({
-        url: `${process.env.MP3_URL_PATTERN.replace(
-          '%s',
-          song.renderResult.operationId
-        )}`,
-        streamTitle: `${chart.info.artist} - ${chart.info.title}`
-      })
+    switch (event.path) {
+      case '/.netlify/functions/radio/getSong':
+        return await getSong(event)
+      default:
+        return {
+          statusCode: 404,
+          body: 'Unknown path'
+        }
     }
   } catch (err) {
     log.error({ err }, 'Failed to get a stream...')
     return { statusCode: 500, body: err.toString() }
+  }
+}
+
+async function getSong(_event) {
+  const client = await connectToMongoDB()
+  const songsCollection = client.db().collection('songs')
+  const songs =
+    songCache ||
+    (songCache = await songsCollection
+      .find({ 'renderResult.uploadedAt': { $exists: true } })
+      .toArray())
+  const random = Math.floor(Math.random() * songs.length)
+  const song = songs[random]
+  const chart = song.renderResult.selectedChart
+  return {
+    statusCode: 200,
+    headers: {
+      'Content-Type': 'application/json;charset=utf-8'
+    },
+    body: JSON.stringify({
+      url: `${process.env.MP3_URL_PATTERN.replace(
+        '%s',
+        song.renderResult.operationId
+      )}`,
+      streamTitle: `${chart.info.artist} - ${chart.info.title}`
+    })
   }
 }
 

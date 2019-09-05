@@ -2,6 +2,7 @@ const { logger, invariant } = require('tkt')
 const axios = require('axios')
 
 let songCache
+let songCacheExpires
 
 // Docs on event and context https://www.netlify.com/docs/functions/#the-handler-method
 exports.handler = async (event, context) => {
@@ -38,7 +39,7 @@ exports.handler = async (event, context) => {
 
 async function getSong(_event) {
   const songs =
-    songCache || (songCache = (await axios.get(process.env.SONGLIST_URL)).data)
+    await getAllSongs()
   const random = Math.floor(Math.random() * songs.length)
   const song = songs[random]
   return {
@@ -52,6 +53,17 @@ async function getSong(_event) {
       info: { song }
     })
   }
+}
+
+async function getAllSongs() {
+  if (Date.now() > songCacheExpires) {
+    songCache = undefined
+  }
+  if (songCache) {
+    return songCache
+  }
+  songCache = (await axios.get(process.env.SONGLIST_URL)).data
+  songCacheExpires = Date.now() + 300e3
 }
 
 async function putSong(_event) {

@@ -7,6 +7,7 @@
 MONGO_URL=mongodb+srv://<user>:<password>@<host>/<db>
 WORKER_URL=https://<domain>.run.app
 MP3_URL_PATTERN=https://<domain>/<path>/%s.mp3
+SONG_UPDATER_URL=https://<user>:<password>@us-central1-be-music-surge-frontend.cloudfunctions.net
 ```
 
 ## Install dependencies

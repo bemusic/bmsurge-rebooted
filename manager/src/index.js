@@ -62,7 +62,8 @@ cli()
     'work',
     'Invokes the worker to process BMS archives',
     {
-      retry: { type: 'boolean', desc: 'Retry previously failed archives' }
+      retry: { type: 'boolean', desc: 'Retry previously failed archives' },
+      force: { type: 'boolean', desc: 'Actually work', alias: ['f'] }
     },
     async args => {
       const log = logger('work')
@@ -77,6 +78,7 @@ cli()
           )
           .toArray()
         log.info('Found %s songs to work on.', found.length)
+        if (!args.force) return
         await Bluebird.map(
           found,
           async song => {

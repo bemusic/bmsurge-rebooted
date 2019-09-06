@@ -56,18 +56,41 @@ exports.putSong = functions.https.onRequest(async (request, response) => {
     return
   }
   console.log('Request body =>', request.body)
+  const songPayload = {
+    playedAt: Date.now(),
+    title: request.body.info.song.title || null,
+    artist: request.body.info.song.artist || null,
+    genre: request.body.info.song.genre || null,
+    event: request.body.info.song.event || null,
+    duration: request.body.info.song.duration || null,
+    md5: request.body.info.song.md5 || null,
+    set: request.body.info.song.event || null
+  }
   await admin
     .database()
     .ref('station')
-    .update({
-      title: request.body.info.song.title || null,
-      artist: request.body.info.song.artist || null,
-      genre: request.body.info.song.genre || null,
-      event: request.body.info.song.event || null,
-      duration: request.body.info.song.duration || null,
-      md5: request.body.info.song.md5 || null,
-      set: request.body.info.song.event || null
-    })
+    .update(songPayload)
+
+  const historyRef = admin.database().ref('station/history')
+
+  // Add new entry to history
+  await admin
+    .database()
+    .ref('station/history')
+    .push(songPayload)
+
+  // Prune old history
+  // https://stackoverflow.com/a/32012520/559913
+  const snapshot = await historyRef
+    .orderByChild('playedAt')
+    .endAt(Date.now() - 3600e3)
+    .once('value')
+  const updates = {}
+  snapshot.forEach(function(child) {
+    updates[child.key] = null
+  })
+  await ref.update(updates)
+
   response.status(200).send('Done!')
 })
 

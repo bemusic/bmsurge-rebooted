@@ -89,7 +89,7 @@ exports.putSong = functions.https.onRequest(async (request, response) => {
   snapshot.forEach(function(child) {
     updates[child.key] = null
   })
-  await ref.update(updates)
+  await historyRef.update(updates)
 
   response.status(200).send('Done!')
 })

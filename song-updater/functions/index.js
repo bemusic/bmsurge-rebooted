@@ -2,12 +2,16 @@ const functions = require('firebase-functions')
 const admin = require('firebase-admin')
 admin.initializeApp()
 
-exports.saveSong = functions.https.onRequest(async (request, response) => {
+function isAuthenticated (request) {
   const expectedApiKey = functions.config().api.key
   const expectedAuth = `Basic ${Buffer.from(`api:${expectedApiKey}`).toString(
     'base64'
   )}`
-  if (request.headers.authorization !== expectedAuth) {
+  return request.headers.authorization === expectedAuth
+}
+
+exports.saveSong = functions.https.onRequest(async (request, response) => {
+  if (!isAuthenticated(request)) {
     response.status(401).send('Unauthorized')
     return
   }
@@ -24,6 +28,21 @@ exports.saveSong = functions.https.onRequest(async (request, response) => {
       md5: request.body.info.song.md5 || null,
       set: request.body.info.song.event || null
     })
-  console.log(request.body)
-  response.status(200).send('Coming soon!')
+  response.status(200).send('Done!')
+})
+
+exports.updateSongDatabase = functions.https.onRequest(async (request, response) => {
+  if (!isAuthenticated(request)) {
+    response.status(401).send('Unauthorized')
+    return
+  }
+  const songs = {}
+  for (const song of request.body) {
+    songs[song.songId] = song
+  }
+  await admin
+    .database()
+    .ref('songs')
+    .set(songs)
+  response.status(200).send('OK!')
 })

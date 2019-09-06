@@ -161,11 +161,14 @@ cli()
     }
   })
   .command(
-    'export-songlist',
-    'Export the songlist',
-    { output: { alias: ['o'], type: 'string', demand: true } },
+    'songlist',
+    'Exports or updates the songlist',
+    {
+      output: { alias: ['o'], type: 'string' },
+      update: { alias: ['u'], type: 'boolean' }
+    },
     async args => {
-      const log = logger('export-songlist')
+      const log = logger('songlist')
       const client = await connectToMongoDB()
       try {
         const songs = await client
@@ -173,7 +176,7 @@ cli()
           .collection('songs')
           .find({ 'renderResult.uploadedAt': { $exists: true } })
           .toArray()
-        const playlist = songs.map(s => {
+        const songlist = songs.map(s => {
           const chart = s.renderResult.selectedChart
           return {
             songId: s._id,
@@ -186,16 +189,23 @@ cli()
             event: s.eventId
           }
         })
-        const result = Buffer.from(
-          '[' + playlist.map(s => '\n  ' + JSON.stringify(s)).join(',') + '\n]'
-        )
-        fs.writeFileSync(args.output, result)
-        log.info(
-          'Exported %s songs to "%s" (%s bytes)',
-          songs.length,
-          args.output,
-          result.length
-        )
+        log.info('Found %s songs', songlist.length)
+        if (args.output) {
+          const json = Buffer.from(
+            '[' +
+              songlist.map(s => '\n  ' + JSON.stringify(s)).join(',') +
+              '\n]'
+          )
+          fs.writeFileSync(args.output, json)
+          log.info('Saved to "%s" (%s bytes)', args.output, json.length)
+        }
+        if (args.update) {
+          const response = await axios.put(
+            `${process.env.SONG_UPDATER_URL}/updateSongDatabase`,
+            songlist
+          )
+          log.info({ responseData: response.data }, 'Songlist updated')
+        }
       } finally {
         client.close()
       }

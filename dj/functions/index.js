@@ -44,7 +44,7 @@ exports.getSong = functions.https.onRequest(async (request, response) => {
   const random = Math.floor(Math.random() * songlist.length)
   const song = songlist[random]
   response.status(200).json({
-    url: `${process.env.MP3_URL_PATTERN.replace('%s', song.fileId)}`,
+    url: `${functions.config().mp3.urlpattern.replace('%s', song.fileId)}`,
     streamTitle: `[${song.genre}] ${song.artist} - ${song.title} [#${song.event}]`,
     info: { song }
   })

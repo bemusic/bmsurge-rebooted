@@ -175,11 +175,25 @@ exports.requests = functions.https.onRequest(async (request, response) => {
       .ref('requests')
       .once('value')
     let activeRequests = 0
+    const originalRequestTime = Date.now()
+    let requestTime = originalRequestTime
+    const QOS = 1200e3
     allRequestsSnapshot.forEach(child => {
-      activeRequests += Object.keys(
-        child.child('requesters').val() || {}
-      ).filter(r => r === userIdHash).length
+      child.child('requesters').forEach(child => {
+        if (child.key === userIdHash) {
+          const lowerLimit = child.val() + QOS
+          if (requestTime < lowerLimit) requestTime = lowerLimit
+          activeRequests++
+        }
+      })
     })
+    if (requestTime > originalRequestTime) {
+      console.log(
+        'Request time shifted by',
+        requestTime - originalRequestTime,
+        'ms due to QOS'
+      )
+    }
     if (activeRequests >= 10) {
       response.status(200).json({
         text:
@@ -192,7 +206,7 @@ exports.requests = functions.https.onRequest(async (request, response) => {
     await requestRef
       .child('requesters')
       .child(userIdHash)
-      .set(admin.database.ServerValue.TIMESTAMP)
+      .set(requestTime)
     await requestRef.child('info').set({
       genre: s.genre,
       artist: s.artist,

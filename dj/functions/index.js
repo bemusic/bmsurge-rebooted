@@ -45,7 +45,8 @@ exports.getSong = functions.https.onRequest(async (request, response) => {
 
   const songlist = await getSonglist()
   const requestCount = r => Object.keys((r && r.requesters) || {}).length
-  const requestTime = r => Math.min(...Object.values((r && r.requesters) || {})) || 0
+  const requestTime = r =>
+    Math.min(...Object.values((r && r.requesters) || {})) || 0
   const requests =
     (await admin
       .database()
@@ -60,8 +61,8 @@ exports.getSong = functions.https.onRequest(async (request, response) => {
     ).map(h => h.songId)
   )
   const fulfillableRequest = _(Object.keys(requests))
-    .sortBy((a) => requestTime(requests[a]))
-    .sortBy((a) => -requestCount(requests[a]))
+    .sortBy(a => requestTime(requests[a]))
+    .sortBy(a => -requestCount(requests[a]))
     .filter(k => !recentlyPlayed.has(k))
     .value()[0]
   const random = Math.floor(Math.random() * songlist.length)
@@ -154,7 +155,10 @@ exports.requests = functions.https.onRequest(async (request, response) => {
     return
   }
   const userId = request.body.userId
-  const userIdHash = require('crypto').createHash('md5').update(userId).digest('hex')
+  const userIdHash = require('crypto')
+    .createHash('md5')
+    .update(userId)
+    .digest('hex')
   console.log('Request body =>', request.body)
   const s = (await admin
     .database()
@@ -172,16 +176,17 @@ exports.requests = functions.https.onRequest(async (request, response) => {
       .once('value')
     let activeRequests = 0
     allRequestsSnapshot.forEach(child => {
-      activeRequests += Object.keys(child.child('requesters').val() || {}).filter(r => r === userIdHash).length
+      activeRequests += Object.keys(
+        child.child('requesters').val() || {}
+      ).filter(r => r === userIdHash).length
     })
     if (activeRequests >= 10) {
-      response
-        .status(200)
-        .json({
-          text: `You already reached a maximum limit of 10 active song requests. ` +
-            `Please wait for your requested song to be played first before retrying the request.`,
-          queued: false,
-        })
+      response.status(200).json({
+        text:
+          `You already reached a maximum limit of 10 active song requests. ` +
+          `Please wait for your requested song to be played first before retrying the request.`,
+        queued: false
+      })
       return
     }
     await requestRef
@@ -204,14 +209,12 @@ exports.requests = functions.https.onRequest(async (request, response) => {
         songId: s.songId,
         songText: songText,
         query: request.body.content,
-        requestedAt: admin.database.ServerValue.TIMESTAMP,
+        requestedAt: admin.database.ServerValue.TIMESTAMP
       })
-    response
-      .status(200)
-      .json({
-        text: `Requested: ${songText}`,
-        queued: true,
-      })
+    response.status(200).json({
+      text: `Requested: ${songText}`,
+      queued: true
+    })
   } else {
     response.status(200).send(`Sorry, didn’t find the song you requested...`)
   }

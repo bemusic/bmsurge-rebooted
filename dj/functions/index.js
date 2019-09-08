@@ -182,7 +182,7 @@ exports.requests = functions.https.onRequest(async (request, response) => {
       child.child('requesters').forEach(child => {
         if (child.key === userIdHash) {
           activeRequests++
-          requestedTimes(child.val())
+          requestedTimes.push(child.val())
         }
       })
     })

@@ -1,6 +1,7 @@
 const functions = require('firebase-functions')
 const admin = require('firebase-admin')
 const _ = require('lodash')
+const QoS = require('./QoS')
 
 admin.initializeApp()
 
@@ -176,17 +177,19 @@ exports.requests = functions.https.onRequest(async (request, response) => {
       .once('value')
     let activeRequests = 0
     const originalRequestTime = Date.now()
-    let requestTime = originalRequestTime
-    const QOS = 1200e3
+    const requestedTimes = []
     allRequestsSnapshot.forEach(child => {
       child.child('requesters').forEach(child => {
         if (child.key === userIdHash) {
-          const lowerLimit = child.val() + QOS
-          if (requestTime < lowerLimit) requestTime = lowerLimit
           activeRequests++
+          requestedTimes(child.val())
         }
       })
     })
+    const requestTime = QoS.getTimeToEnqueue(
+      originalRequestTime,
+      requestedTimes
+    )
     if (requestTime > originalRequestTime) {
       console.log(
         'Request time shifted by',

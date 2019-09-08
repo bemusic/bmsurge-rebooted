@@ -194,10 +194,10 @@ exports.requests = functions.https.onRequest(async (request, response) => {
         'ms due to QOS'
       )
     }
-    if (activeRequests >= 10) {
+    if (activeRequests >= 20) {
       response.status(200).json({
         text:
-          `You already reached a maximum limit of 10 active song requests. ` +
+          `You already reached a maximum limit of 20 active song requests. ` +
           `Please wait for your requested song to be played first before retrying the request.`,
         queued: false
       })

@@ -1,7 +1,7 @@
 function getTimeToEnqueue(
   currentTime,
   requestedTimes,
-  { margin = 600e3, insertSpace = 960e3 }
+  { margin = 600e3, insertSpace = 960e3 } = {}
 ) {
   const possibleTimesToInsertAfter = [currentTime, ...requestedTimes]
   return (

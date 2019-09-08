@@ -1,3 +1,4 @@
+// @ts-check
 const functions = require('firebase-functions')
 const admin = require('firebase-admin')
 const _ = require('lodash')
@@ -155,16 +156,17 @@ exports.requests = functions.https.onRequest(async (request, response) => {
     response.status(401).send('Unauthorized')
     return
   }
+  const username = request.body.username
+  const songId = request.body.songId
   const userId = request.body.userId
-  const userIdHash = require('crypto')
-    .createHash('md5')
-    .update(userId)
-    .digest('hex')
+  const query = request.body.content
   console.log('Request body =>', request.body)
+
+  const userIdHash = hashUserId(userId)
   const s = (await admin
     .database()
     .ref('songs')
-    .child(request.body.songId)
+    .child(songId)
     .once('value')).val()
   if (s) {
     const requestRef = admin
@@ -221,11 +223,11 @@ exports.requests = functions.https.onRequest(async (request, response) => {
       .database()
       .ref('logs/requests')
       .push({
-        userId: request.body.userId,
-        username: request.body.username,
+        userId: userId,
+        username: username,
         songId: s.songId,
         songText: songText,
-        query: request.body.content,
+        query: query,
         requestedAt: admin.database.ServerValue.TIMESTAMP
       })
     response.status(200).json({
@@ -236,3 +238,23 @@ exports.requests = functions.https.onRequest(async (request, response) => {
     response.status(200).send(`Sorry, didn’t find the song you requested...`)
   }
 })
+
+exports.token = functions.https.onRequest(async (request, response) => {
+  if (!isAuthenticated(request)) {
+    response.status(401).send('Unauthorized')
+    return
+  }
+  const userId = request.body.userId
+  const username = request.body.username
+  const token = await admin.auth().createCustomToken(userId, {
+    displayName: username,
+    userIdHash: hashUserId(userId)
+  })
+  response.status(200).json({ token })
+})
+function hashUserId(userId) {
+  return require('crypto')
+    .createHash('md5')
+    .update(userId)
+    .digest('hex')
+}

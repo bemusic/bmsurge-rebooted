@@ -83,7 +83,15 @@ exports.getSong = functions.https.onRequest(async (request, response) => {
   response.status(200).json({
     url: `${functions.config().mp3.urlpattern.replace('%s', song.fileId)}`,
     streamTitle: `[${song.genre}] ${song.artist} - ${song.title} [#${song.event}]`,
-    info: { song, requested }
+    info: {
+      song,
+      requested,
+      requesters:
+        (requested &&
+          requests[song.songId] &&
+          requests[song.songId].requesters) ||
+        null
+    }
   })
 })
 
@@ -103,7 +111,8 @@ exports.putSong = functions.https.onRequest(async (request, response) => {
     duration: request.body.info.song.duration || null,
     md5: request.body.info.song.md5 || null,
     set: request.body.info.song.event || null,
-    requested: request.body.info.requested || false
+    requested: request.body.info.requested || false,
+    requesters: request.body.info.requesters || null
   }
   await admin
     .database()
@@ -151,17 +160,13 @@ exports.updateSongDatabase = functions.https.onRequest(
   }
 )
 
-exports.requests = functions.https.onRequest(async (request, response) => {
-  if (!isAuthenticated(request)) {
-    response.status(401).send('Unauthorized')
-    return
-  }
-  const username = request.body.username
-  const songId = request.body.songId
-  const userId = request.body.userId
-  const query = request.body.content
-  console.log('Request body =>', request.body)
-
+/**
+ * @param {string} userId
+ * @param {string} username
+ * @param {string} songId
+ * @param {string} query
+ */
+async function requestSong(userId, username, songId, query) {
   const userIdHash = hashUserId(userId)
   const s = (await admin
     .database()
@@ -200,13 +205,12 @@ exports.requests = functions.https.onRequest(async (request, response) => {
       )
     }
     if (activeRequests >= 20) {
-      response.status(200).json({
+      return {
         text:
           `You already reached a maximum limit of 20 active song requests. ` +
           `Please wait for your requested song to be played first before retrying the request.`,
         queued: false
-      })
-      return
+      }
     }
     await requestRef
       .child('requesters')
@@ -230,13 +234,47 @@ exports.requests = functions.https.onRequest(async (request, response) => {
         query: query,
         requestedAt: admin.database.ServerValue.TIMESTAMP
       })
-    response.status(200).json({
+    return {
       text: `Requested: ${songText}`,
       queued: true
-    })
+    }
   } else {
-    response.status(200).send(`Sorry, didn’t find the song you requested...`)
+    return {
+      text: `Sorry, didn’t find the song you requested...`,
+      queued: false
+    }
   }
+}
+
+exports.requests = functions.https.onRequest(async (request, response) => {
+  if (!isAuthenticated(request)) {
+    response.status(401).send('Unauthorized')
+    return
+  }
+  const username = request.body.username
+  const songId = request.body.songId
+  const userId = request.body.userId
+  const query = request.body.content
+  console.log('Request body =>', request.body)
+  const result = await requestSong(userId, username, songId, query)
+  response.status(200).json(result)
+})
+
+exports.requestFromWeb = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError(
+      'failed-precondition',
+      'The function must be called while authenticated.'
+    )
+  }
+  console.log('AUTH', context.auth)
+  console.log('AUTH TOKEN', context.auth.token)
+  const username = context.auth.token.displayName
+  const userId = context.auth.uid
+  const songId = String(data.songId)
+  const query = String(data.query)
+  const result = await requestSong(userId, username, songId, query)
+  return result
 })
 
 exports.token = functions.https.onRequest(async (request, response) => {

@@ -13,7 +13,10 @@
       integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T"
       crossorigin="anonymous"
     />
-    <link rel="stylesheet" href="https://unpkg.com/bootstrap-vue@2.0.0-rc.28/dist/bootstrap-vue.min.css">
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/bootstrap-vue@2.0.0-rc.28/dist/bootstrap-vue.min.css"
+    />
   </head>
   <body>
     <div id="app">
@@ -53,31 +56,11 @@
             small
           >
             <template slot="[status]" slot-scope="{ item: song }">
-              <span class="badge" :class="statusBadge(song.status)">{{song.status}}</span>
+              <span class="badge" :class="statusBadge(song.status)">{{
+                song.status
+              }}</span>
             </template>
           </b-table>
-          <!--<table class="table table-sm">-->
-          <!--  <thead>-->
-          <!--    <tr>-->
-          <!--      <th scope="col">Event</th>-->
-          <!--      <th scope="col">File</th>-->
-          <!--      <th scope="col">Genre</th>-->
-          <!--      <th scope="col">Title</th>-->
-          <!--      <th scope="col">Artist</th>-->
-          <!--      <th scope="col">Status</th>-->
-          <!--    </tr>-->
-          <!--  </thead>-->
-          <!--  <tbody>-->
-          <!--    <tr v-for="song in report.songs" :key="song._id" @click="songClick(song)">-->
-          <!--      <td>{{ song.eventId }}</td>-->
-          <!--      <td>{{ song.packageFile }}</td>-->
-          <!--      <td>{{ song.chart && song.chart.info && song.chart.info.genre }}</td>-->
-          <!--      <td>{{ song.chart && song.chart.info && song.chart.info.title }}</td>-->
-          <!--      <td>{{ song.chart && song.chart.info && song.chart.info.artist }}</td>-->
-          <!--      <td><span class="badge" :class="statusBadge(song.status)">{{song.status}}</span</td>-->
-          <!--    </tr>-->
-          <!--  </tbody>-->
-          <!--</table>-->
         </template>
         <div v-else>Loading report...</div>
       </main>
@@ -100,7 +83,7 @@
             { key: '_id', sortable: true },
             { key: 'eventId', sortable: true },
             { key: 'packageFile', sortable: true },
-            { key: 'status', sortable: true },
+            { key: 'status', sortable: true }
           ]
         },
         async mounted() {
@@ -121,7 +104,7 @@
             return {
               done: 'badge-success',
               error: 'badge-danger',
-              pending: 'badge-secondary',
+              pending: 'badge-secondary'
             }[status]
           },
           songClick(song) {

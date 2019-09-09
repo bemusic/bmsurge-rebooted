@@ -165,9 +165,17 @@ cli()
     'Exports or updates the songlist',
     {
       output: { alias: ['o'], type: 'string' },
-      update: { alias: ['u'], type: 'boolean' }
+      update: { alias: ['u'], type: 'boolean' },
+      index: { type: 'string' }
     },
     async args => {
+      const indexTime = args.index
+      const indexDate = new Date(indexTime)
+      if (indexTime && !+indexDate) {
+        throw new Error(
+          'Invalid index time specified (e.g. date cannot be parsed)'
+        )
+      }
       const log = logger('songlist')
       const client = await connectToMongoDB()
       try {
@@ -176,17 +184,21 @@ cli()
           .collection('songs')
           .find({ 'renderResult.uploadedAt': { $exists: true } })
           .toArray()
+        const updatedTimeMap = new Map(
+          songs.map(s => [String(s._id), s.renderedAt])
+        )
         const songlist = songs.map(s => {
           const chart = s.renderResult.selectedChart
           return {
-            songId: s._id,
+            songId: String(s._id),
             fileId: s.renderResult.operationId,
             genre: chart.info.genre,
             title: chart.info.title,
             artist: chart.info.artist,
             md5: chart.md5,
             duration: s.renderResult.wavSizeAfterTrimEnd / (44100 * 2 * 2),
-            event: s.eventId
+            event: s.eventId,
+            updatedAt: s.renderedAt
           }
         })
         log.info('Found %s songs', songlist.length)
@@ -204,7 +216,21 @@ cli()
             `${process.env.SONG_UPDATER_URL}/updateSongDatabase`,
             songlist
           )
-          log.info({ responseData: response.data }, 'Songlist updated')
+          log.info({ responseData: response.data }, 'Songlist updated on DJ')
+        }
+        if (args.index) {
+          const filteredSonglist = songlist.filter(
+            s => +updatedTimeMap.get(s.songId) >= +indexDate
+          )
+          log.info('Indexing %s songs', filteredSonglist.length)
+          const response2 = await axios.patch(
+            `${process.env.MUSIC_REQUEST_URL}/songlist`,
+            filteredSonglist
+          )
+          log.info(
+            { responseData: response2.data },
+            'Songlist updated on music request'
+          )
         }
       } finally {
         client.close()

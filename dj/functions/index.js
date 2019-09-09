@@ -186,13 +186,13 @@ async function requestSong(userId, username, songId, query) {
     const originalRequestTime = Date.now()
     const requestedTimes = []
     const allRequestedTimes = []
-    allRequestsSnapshot.forEach(child => {
-      child.child('requesters').forEach(child => {
-        if (child.key === userIdHash) {
+    allRequestsSnapshot.forEach(request => {
+      request.child('requesters').forEach(requester => {
+        if (requester.key === userIdHash) {
           activeRequests++
-          requestedTimes.push(child.val())
+          requestedTimes.push(requester.val())
         }
-        allRequestedTimes.push(child.val())
+        allRequestedTimes.push(requester.val())
       })
     })
     const requestTime = QoS.getTimeToEnqueue(

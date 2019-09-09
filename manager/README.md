@@ -70,7 +70,25 @@ Google Cloud Run. Thanks to Google Cloud Run, we can render hundreds of songs
 simultaneously. From my test 1,000 songs can be rendered in less than 30
 minutes!
 
-## Web-based dashboard
+## Update the songlist on downstream services
+
+```
+node src/index.js songlist -o private/_songlist.json --update --index=YYYY-MM-DDT00:00:00Z
+```
+
+This will read from the database to find all songs that have been rendered
+successfully, and generate a songlist.
+
+- `-o` saves the generated songlist to a JSON file.
+- `--update` uploads the songlist to the [dj](../dj/) system, which allows the
+  song to be streamed on the station.
+- `--index` uploads the songlist to the
+  [song request system](https://github.com/bemusic/bmsurge-music-request)’s
+  search index. Due to Algolia’s limits, we can’t upload the full songlist; we
+  must upload only the changes to stay within the free operations limit. Send in
+  a timestamp to specify the minimum update time to index.
+
+## Web-based dashboard (unused)
 
 ```
 env PORT=8082 node src/index.js server

@@ -43,8 +43,11 @@ exports.generateReport = async function generateReport(client) {
         offset: offset,
         timeRange: renderResult
           ? (() => {
-              const events = renderResult.events
-              return [events[0].time, events[events.length - 1].time]
+              const renderEvents = renderResult.events
+              return [
+                renderEvents[0].time,
+                renderEvents[renderEvents.length - 1].time
+              ]
             })()
           : undefined
       }

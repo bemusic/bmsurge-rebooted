@@ -185,17 +185,20 @@ async function requestSong(userId, username, songId, query) {
     let activeRequests = 0
     const originalRequestTime = Date.now()
     const requestedTimes = []
+    const allRequestedTimes = []
     allRequestsSnapshot.forEach(child => {
       child.child('requesters').forEach(child => {
         if (child.key === userIdHash) {
           activeRequests++
           requestedTimes.push(child.val())
         }
+        allRequestedTimes.push(child.val())
       })
     })
     const requestTime = QoS.getTimeToEnqueue(
       originalRequestTime,
-      requestedTimes
+      requestedTimes,
+      { allRequestedTimes }
     )
     if (requestTime > originalRequestTime) {
       console.log(
@@ -232,7 +235,8 @@ async function requestSong(userId, username, songId, query) {
         songId: s.songId,
         songText: songText,
         query: query,
-        requestedAt: admin.database.ServerValue.TIMESTAMP
+        requestedAt: admin.database.ServerValue.TIMESTAMP,
+        queuedTime: requestTime
       })
     return {
       text: `Requested: ${songText}`,

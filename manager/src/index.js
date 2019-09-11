@@ -182,7 +182,7 @@ cli()
         const songs = await client
           .db()
           .collection('songs')
-          .find({ 'renderResult.uploadedAt': { $exists: true } })
+          .find({ 'renderResult.uploadedAt': { $exists: true }, disabled: { $ne: true } })
           .toArray()
         const updatedTimeMap = new Map(
           songs.map(s => [String(s._id), s.renderedAt])

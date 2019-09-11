@@ -20,6 +20,10 @@ cli()
         desc: 'URL of the package to extract',
         type: 'string'
       },
+      encoding: {
+        desc: 'Input encoding',
+        type: 'string'
+      },
       output: {
         desc: 'Output MP3 file',
         type: 'string',
@@ -30,7 +34,12 @@ cli()
       /** @type {OutputDiagnostics} */
       const result = { events: [], warnings: [] }
       const log = logger('render:cli')
-      await render(args.url, args.output, result)
+      await render(args.url, args.output, {
+        outputDiagnostics: result,
+        renderOptions: {
+          encoding: /** @type {any} */ (args.encoding)
+        }
+      })
       log.info({ result }, 'Finished')
     }
   )
@@ -64,7 +73,10 @@ cli()
         writeStatus()
         const interval = setInterval(writeStatus, 5000)
 
-        await render(req.body.url, null, result)
+        await render(req.body.url, null, {
+          outputDiagnostics: result,
+          renderOptions: req.body.renderOptions
+        })
         opLog.info({ result }, 'Render result')
         const bucketName = process.env.BMSURGE_RENDER_OUTPUT_BUCKET
         if (result.outFile) {
@@ -100,12 +112,18 @@ cli()
 /**
  * @param {string} url
  * @param {string|null} outputMp3Path
- * @param {OutputDiagnostics} outputDiagnostics
+ * @param {object} options
+ * @param {OutputDiagnostics} [options.outputDiagnostics]
+ * @param {object} [options.renderOptions]
+ * @param {'auto' | 'sjis'} [options.renderOptions.encoding]
  */
 async function render(
   url,
   outputMp3Path,
-  outputDiagnostics = { events: [], warnings: [] }
+  {
+    outputDiagnostics = { events: [], warnings: [] },
+    renderOptions: { encoding = 'sjis' } = {}
+  } = {}
 ) {
   const log = logger('render')
   const workDir = `/tmp/bmsurge-renderer/${ObjectID.default.generate()}`
@@ -166,8 +184,14 @@ async function render(
       const sourceFilepath = `${extractedDir}/${sourceName}`
       const extname = path.extname(sourceName)
       let targetName = path.basename(sourceName)
-      if (!isUtf8(fs.readFileSync(sourceFilepath))) {
-        targetName = `${path.basename(sourceName, extname)}.sjis${extname}`
+      const fileContents = fs.readFileSync(sourceFilepath)
+      const hasBOM = b =>
+        (b[0] === 0xfe && b[1] === 0xff) || (b[0] === 0xff && b[1] === 0xfe)
+      if (!isUtf8(fileContents) && !hasBOM(fileContents)) {
+        targetName =
+          path.basename(sourceName, extname) +
+          (encoding === 'auto' ? '' : `.${encoding}`) +
+          extname
       }
       reverseFilenameMap.set(targetName, sourceName)
       const targetFilepath = `${convertedDir}/${targetName}`

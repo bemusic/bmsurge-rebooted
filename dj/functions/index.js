@@ -1,4 +1,5 @@
 // @ts-check
+const zlib = require('zlib')
 const functions = require('firebase-functions')
 const admin = require('firebase-admin')
 const _ = require('lodash')
@@ -28,9 +29,9 @@ function getSonglist() {
     promise: admin
       .storage()
       .bucket()
-      .file('songlist.json')
+      .file('songlist.json.gz')
       .download()
-      .then(([contents]) => JSON.parse(String(contents)))
+      .then(([contents]) => JSON.parse(String(zlib.unzipSync(contents))))
       .catch(e => {
         songlistCache = null
         throw e
@@ -175,6 +176,14 @@ exports.updateSongDatabase = functions.https.onRequest(
       .bucket()
       .file('songlist.json')
       .save(JSON.stringify(songlist), { resumable: false })
+    await admin
+      .storage()
+      .bucket()
+      .file('songlist.json.gz')
+      .save(
+        zlib.gzipSync(Buffer.from(JSON.stringify(songlist)), { level: 9 }),
+        { resumable: false }
+      )
     response.status(200).send('OK!')
   }
 )
@@ -328,7 +337,11 @@ exports.reactions = functions.https.onRequest(async (request, response) => {
     .child(request.body.songId)
     .child(request.body.emoji)
     .child(request.body.messageId)
-    .set(request.body.action === 'add' ? admin.database.ServerValue.TIMESTAMP : null)
+    .set(
+      request.body.action === 'add'
+        ? admin.database.ServerValue.TIMESTAMP
+        : null
+    )
   response.status(200).json({ ok: true })
 })
 

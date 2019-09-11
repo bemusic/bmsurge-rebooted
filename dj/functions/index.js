@@ -26,10 +26,11 @@ function getSonglist() {
   }
   songlistCache = {
     promise: admin
-      .database()
-      .ref('songs')
-      .once('value')
-      .then(snapshot => Object.values(snapshot.val()))
+      .storage()
+      .bucket()
+      .file('songlist.json')
+      .download()
+      .then(([contents]) => JSON.parse(String(contents)))
       .catch(e => {
         songlistCache = null
         throw e
@@ -80,20 +81,40 @@ exports.getSong = functions.https.onRequest(async (request, response) => {
       .child(fulfillableRequest)
       .set(null)
   }
+  const info = {
+    song,
+    requested,
+    requesters:
+      (requested &&
+        requests[song.songId] &&
+        requests[song.songId].requesters) ||
+      null
+  }
+  await admin
+    .database()
+    .ref('station/next')
+    .update(getPublicSongPayload(info))
   response.status(200).json({
     url: `${functions.config().mp3.urlpattern.replace('%s', song.fileId)}`,
     streamTitle: `[${song.genre}] ${song.artist} - ${song.title} [#${song.event}]`,
-    info: {
-      song,
-      requested,
-      requesters:
-        (requested &&
-          requests[song.songId] &&
-          requests[song.songId].requesters) ||
-        null
-    }
+    info
   })
 })
+
+function getPublicSongPayload(info) {
+  return {
+    songId: info.song.songId || null,
+    title: info.song.title || null,
+    artist: info.song.artist || null,
+    genre: info.song.genre || null,
+    event: info.song.event || null,
+    duration: info.song.duration || null,
+    md5: info.song.md5 || null,
+    set: info.song.event || null,
+    requested: info.requested || false,
+    requesters: info.requesters || null
+  }
+}
 
 exports.putSong = functions.https.onRequest(async (request, response) => {
   if (!isAuthenticated(request)) {
@@ -103,16 +124,7 @@ exports.putSong = functions.https.onRequest(async (request, response) => {
   console.log('Request body =>', request.body)
   const songPayload = {
     playedAt: Date.now(),
-    songId: request.body.info.song.songId || null,
-    title: request.body.info.song.title || null,
-    artist: request.body.info.song.artist || null,
-    genre: request.body.info.song.genre || null,
-    event: request.body.info.song.event || null,
-    duration: request.body.info.song.duration || null,
-    md5: request.body.info.song.md5 || null,
-    set: request.body.info.song.event || null,
-    requested: request.body.info.requested || false,
-    requesters: request.body.info.requesters || null
+    ...getPublicSongPayload(request.body.info)
   }
   await admin
     .database()
@@ -149,13 +161,20 @@ exports.updateSongDatabase = functions.https.onRequest(
       return
     }
     const songs = {}
+    const songlist = []
     for (const song of request.body) {
       songs[song.songId] = song
+      songlist.push(song)
     }
     await admin
       .database()
       .ref('songs')
       .set(songs)
+    await admin
+      .storage()
+      .bucket()
+      .file('songlist.json')
+      .save(JSON.stringify(songlist), { resumable: false })
     response.status(200).send('OK!')
   }
 )

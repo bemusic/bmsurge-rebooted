@@ -313,6 +313,25 @@ exports.token = functions.https.onRequest(async (request, response) => {
   })
   response.status(200).json({ token })
 })
+
+exports.reactions = functions.https.onRequest(async (request, response) => {
+  if (!isAuthenticated(request)) {
+    response.status(401).send('Unauthorized')
+    return
+  }
+  const userId = request.body.userId
+  const username = request.body.username
+  const ref = admin
+    .database()
+    .ref('reactions')
+    .child(userId)
+    .child(request.body.songId)
+    .child(request.body.emoji)
+    .child(request.body.messageId)
+    .set(request.body.action === 'add' ? admin.database.ServerValue.TIMESTAMP : null)
+  response.status(200).json({ ok: true })
+})
+
 function hashUserId(userId) {
   return require('crypto')
     .createHash('md5')

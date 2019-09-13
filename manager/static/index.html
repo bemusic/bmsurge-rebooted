@@ -62,20 +62,29 @@
       <div>
         <template v-if="report">
           <h2>Unfinished items ({{ unfinishedItems.length }})</h2>
-          <song-table :songs="unfinishedItems"></song-table>
+          <song-table
+            :songs="unfinishedItems"
+            :entry-map="entryMap"
+          ></song-table>
           <h2>Unassigned items ({{ unassignedItems.length }})</h2>
           <p>Available entries to match: {{ availableEntries.length }}</p>
           <p>
-            <button class="btn btn-sm btn-primary" @click="autoMatch">
+            <button class="btn btn-sm btn-success" @click="autoMatch">
               Auto-match
+            </button>
+            <button class="btn btn-sm btn-danger" @click="resetAll">
+              Reset all
             </button>
             <button class="btn btn-sm btn-primary" @click="save">
               Save changes
             </button>
           </p>
-          <song-table :songs="unassignedItems"></song-table>
+          <song-table
+            :songs="unassignedItems"
+            :entry-map="entryMap"
+          ></song-table>
           <h2>Assigned items ({{ assignedItems.length }})</h2>
-          <song-table :songs="assignedItems"></song-table>
+          <song-table :songs="assignedItems" :entry-map="entryMap"></song-table>
           <datalist id="available-entries">
             <option
               v-for="entry in availableEntries"
@@ -112,6 +121,9 @@
           entries() {
             const event = this.report.event
             return (event && event.entries) || []
+          },
+          entryMap() {
+            return new Map(this.entries.map(e => [e.entryId, e]))
           },
           items() {
             return this.report.songs
@@ -207,6 +219,7 @@
             const entries = this.entries
 
             const matches = []
+            const used = new Set()
             for (const song of items) {
               const title = song.selectedChart.info.title
               const entryMatches = entries.filter(e => e.title === title)
@@ -217,6 +230,15 @@
                 )
                 if (itemMatches.length === 1) {
                   matches.push({ entry, song })
+                  if (used.has(entry.entryId)) {
+                    alert(
+                      'Abnormal operation: ' +
+                        entry.entryId +
+                        ' used many times'
+                    )
+                    return
+                  }
+                  used.add(entry.entryId)
                 }
               }
             }
@@ -224,6 +246,11 @@
             for (const { entry, song } of matches) {
               song.entryAssignment.entryId = entry.entryId
             }
+          },
+          resetAll() {
+            this.items.forEach(s => {
+              s.entryAssignment.entryId = null
+            })
           }
         }
       }
@@ -245,8 +272,9 @@
             <td>{{ song.packageFile }}</td>
             <td>
               <span v-if="song.selectedChart">
-                【{{ song.selectedChart.info.genre }}】
-                <cite>{{ song.selectedChart.info.artist }}</cite> —
+                【{{ song.selectedChart.info.genre }}】<br />
+                <cite>{{ song.selectedChart.info.artist }}</cite
+                ><br />
                 {{ song.selectedChart.info.title }}
               </span>
             </td>
@@ -254,7 +282,12 @@
               :class="{'table-warning': (song.entryAssignment.entryId || '') !== (song.entryId || '')}"
             >
               <template v-if="song.entryAssignment.entryId">
-                {{ song.entryAssignment.entryId }}
+                <strong>{{ song.entryAssignment.entryId }}</strong>
+                <a href="#" @click="clearEntryID($event, song)">X</a>
+                <entry-title
+                  :entry-map="entryMap"
+                  :entry-id="song.entryAssignment.entryId"
+                ></entry-title>
               </template>
               <template v-else>
                 <form @submit="setEntryID($event, song)">
@@ -272,7 +305,7 @@
     </template>
     <script>
       components['song-table'] = {
-        props: ['songs'],
+        props: ['songs', 'entryMap'],
         template: '#song-table-template',
         methods: {
           setEntryID(event, song) {
@@ -282,6 +315,42 @@
             event.preventDefault()
             song.entryAssignment.entryId = input.value
             if (nextInput) nextInput.focus()
+          },
+          clearEntryID(event, song) {
+            event.preventDefault()
+            song.entryAssignment.entryId = null
+          }
+        },
+        computed: {
+          entry() {
+            return (
+              this.entryMap && this.entryMap.get(song.entryAssignment.entryId)
+            )
+          }
+        }
+      }
+    </script>
+
+    <template id="entry-title-template">
+      <span>
+        【{{ entry.genre }}】<br /><cite>{{ entry.artist }}</cite
+        ><br />
+        {{ entry.title }}
+      </span>
+    </template>
+    <script>
+      components['entry-title'] = {
+        props: ['entryId', 'entryMap'],
+        template: '#entry-title-template',
+        computed: {
+          entry() {
+            return (
+              (this.entryMap && this.entryMap.get(this.entryId)) || {
+                title: '??',
+                artist: '??',
+                genre: '??'
+              }
+            )
           }
         }
       }

@@ -1,16 +1,22 @@
 /**
  * @param {import("mongodb").MongoClient} client
+ * @param {any} args
  */
-exports.generateReport = async function generateReport(client) {
+exports.generateReport = async function generateReport(client, args) {
+  const songFilters = {}
+  const eventFilters = {}
+  if (args.eventId) {
+    songFilters.eventId = eventFilters._id = String(args.eventId)
+  }
   const songs = await client
     .db()
     .collection('songs')
-    .find({})
+    .find(songFilters)
     .toArray()
   const events = await client
     .db()
     .collection('events')
-    .find({})
+    .find(eventFilters)
     .toArray()
   return {
     events,
@@ -35,7 +41,7 @@ exports.generateReport = async function generateReport(client) {
         renderedAt: s.renderedAt,
         status,
         packageFile: decodeURIComponent(s.url.split('/').pop()),
-        chart: selectedChart,
+        selectedChart: selectedChart,
         md5s: ((renderResult && renderResult.availableCharts) || []).map(
           c => c.md5
         ),

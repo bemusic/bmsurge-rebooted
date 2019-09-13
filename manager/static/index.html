@@ -24,94 +24,227 @@
         <a class="navbar-brand" href="/">Be-Music Surge</a>
       </nav>
       <main role="main" class="container-fluid">
-        <template v-if="report">
-          <b-row>
-            <b-col>
-              <b-form-input
-                v-model="filter"
-                type="search"
-                placeholder="Type to Search"
-              ></b-form-input>
-            </b-col>
-            <b-col cols="auto">
-              <b-pagination
-                v-model="currentPage"
-                :total-rows="items.length"
-                :per-page="perPage"
-                aria-controls="songlist"
-              ></b-pagination>
-            </b-col>
-          </b-row>
-          <b-table
-            id="songlist"
-            :items="items"
-            :per-page="perPage"
-            :current-page="currentPage"
-            :fields="fields"
-            :sort-by.sync="sortBy"
-            :sort-desc.sync="sortDesc"
-            :filter="filter"
-            :filter-included-fields="filterOn"
-            primary-key="_id"
-            small
-          >
-            <template slot="[status]" slot-scope="{ item: song }">
-              <span class="badge" :class="statusBadge(song.status)">{{
-                song.status
-              }}</span>
-            </template>
-          </b-table>
-        </template>
-        <div v-else>Loading report...</div>
+        <router-view></router-view>
       </main>
     </div>
-
-    <script src="https://unpkg.com/vue@2.6.10/dist/vue.js"></script>
-    <script src="https://unpkg.com/bootstrap-vue@2.0.0-rc.28/dist/bootstrap-vue.min.js"></script>
     <script>
-      appInstance = new Vue({
-        el: '#app',
-        data: {
-          report: null,
-          perPage: 20,
-          currentPage: 1,
-          sortBy: '_id',
-          sortDesc: false,
-          filter: '',
-          filterOn: ['packageFile'],
-          fields: [
-            { key: '_id', sortable: true },
-            { key: 'eventId', sortable: true },
-            { key: 'packageFile', sortable: true },
-            { key: 'status', sortable: true }
-          ]
-        },
-        async mounted() {
-          try {
-            const report = await fetch('/report.json').then(r => r.json())
-            this.report = report
-          } catch (e) {
-            alert(e)
-          }
-        },
-        computed: {
-          items() {
-            return this.report.songs
-          }
-        },
-        methods: {
-          statusBadge(status) {
+      const routes = []
+      const components = {}
+      function startApp() {
+        return new Vue({
+          router: new VueRouter({ routes }),
+          el: '#app'
+        })
+      }
+    </script>
+
+    <template id="home-page">
+      <div>
+        Home page
+      </div>
+    </template>
+    <script>
+      routes.push({
+        path: '/',
+        component: {
+          template: '#home-page'
+        }
+      })
+    </script>
+
+    <template id="event-page">
+      <div>
+        <template v-if="report">
+          <h2>Unfinished items ({{ unfinishedItems.length }})</h2>
+          <song-table :songs="unfinishedItems"></song-table>
+          <h2>Unassigned items ({{ unassignedItems.length }})</h2>
+          <p>
+            <p>
+              Available entries to match: {{availableEntries.length}}
+            </p>
+            <button class="btn btn-sm btn-primary" @click="autoMatch">
+              Auto-Match
+            </button>
+          </p>
+          <song-table :songs="unassignedItems"></song-table>
+          <h2>Assigned items ({{ assignedItems.length }})</h2>
+          <song-table :songs="assignedItems"></song-table>
+          <datalist id="available-entries">
+            <option v-for="entry in availableEntries" :key="entry.entryId" :value="entry.entryId">{{ entryName(entry) }}</option>
+          </datalist>
+        </template>
+        <div v-else>Loading report...</div>
+      </div>
+    </template>
+    <script>
+      routes.push({
+        path: '/event/:eventId',
+        component: {
+          template: '#event-page',
+          data() {
             return {
-              done: 'badge-success',
-              error: 'badge-danger',
-              pending: 'badge-secondary'
-            }[status]
+              report: null,
+              songEntryAssignmentMap: new Map()
+            }
           },
-          songClick(song) {
-            console.log(JSON.parse(JSON.stringify(song)))
+          async mounted() {
+            window.currentEventPage = this
+            try {
+              const eventId = this.$route.params.eventId
+              const url = '/report.json?eventId=' + eventId
+              const report = await fetch(url).then(r => r.json())
+              this.report = {
+                songs: report.songs.map(song =>
+                  Object.assign(song, {
+                    entryAssignment: this.getEntryAssignmentForSongId(song._id)
+                  })
+                ),
+                event: report.events.find(e => e._id === eventId)
+              }
+            } catch (e) {
+              alert(e)
+            }
+          },
+          computed: {
+            entries() {
+              const event = this.report.event
+              return (event && event.entries) || []
+            },
+            items() {
+              return this.report.songs
+            },
+            unfinishedItems() {
+              return this.items.filter(
+                s => s.status === 'error' || s.status === 'pending'
+              )
+            },
+            renderedItems() {
+              return this.items.filter(s => s.status === 'done')
+            },
+            assignedItems() {
+              return this.renderedItems.filter(s => !!s.entryAssignment.entryId)
+            },
+            unassignedItems() {
+              return this.renderedItems.filter(s => !s.entryAssignment.entryId)
+            },
+            availableEntries() {
+              const assignedEntryIds = new Set(this.assignedItems.map(s => s.entryAssignment.entryId))
+              return this.entries.filter(e => !assignedEntryIds.has(e.entryId))
+            }
+          },
+          methods: {
+            getEntryAssignmentForSongId(songId) {
+              if (!this.songEntryAssignmentMap.has(songId)) {
+                this.songEntryAssignmentMap.set(
+                  songId,
+                  // new Vue({
+                  //   data: { state: { entryId: null } }
+                  // }).state
+                  { entryId: null }
+                )
+              }
+              return this.songEntryAssignmentMap.get(songId)
+            },
+            statusBadge(status) {
+              return {
+                done: 'badge-success',
+                error: 'badge-danger',
+                pending: 'badge-secondary'
+              }[status]
+            },
+            songClick(song) {
+              console.log(JSON.parse(JSON.stringify(song)))
+            },
+            entryName(entry) {
+              return `[${entry.genre}] ${entry.artist} - ${entry.title}`
+            },
+            autoMatch() {
+              const items = this.renderedItems
+              const entries = this.entries
+
+              const matches = []
+              for (const song of items) {
+                const title = song.selectedChart.info.title
+                const entryMatches = entries.filter(e => e.title === title)
+                if (entryMatches.length === 1) {
+                  const [entry] = entryMatches
+                  const itemMatches = items.filter(
+                    s => s.selectedChart.info.title === entry.title
+                  )
+                  if (itemMatches.length === 1) {
+                    matches.push({ entry, song })
+                  }
+                }
+              }
+
+              for (const { entry, song } of matches) {
+                song.entryAssignment.entryId = entry.entryId
+              }
+            }
           }
         }
       })
+    </script>
+
+    <template id="song-table-template">
+      <table class="table table-sm">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>File</th>
+            <th>Song</th>
+            <th>Entry</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="song of songs" :key="song._id">
+            <td>{{ song._id }}</td>
+            <td>{{ song.packageFile }}</td>
+            <td>
+              <span v-if="song.selectedChart">
+                【{{ song.selectedChart.info.genre }}】
+                <cite>{{ song.selectedChart.info.artist }}</cite> —
+                {{ song.selectedChart.info.title }}
+              </span>
+            </td>
+            <td>
+              <template v-if="song.entryAssignment.entryId">
+                  {{ song.entryAssignment.entryId }}
+              </template>
+              <template v-else>
+                <form @submit="setEntryID($event, song)">
+                  <input list='available-entries' name='entryId' class='entry-input' />
+                </form>
+              </template>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </template>
+    <script>
+      components['song-table'] = {
+        props: ['songs'],
+        template: '#song-table-template',
+        methods: {
+          setEntryID(event, song) {
+            const inputs = Array.from(document.querySelectorAll('.entry-input'))
+            const input = event.target.entryId
+            const nextInput = inputs[inputs.indexOf(input) + 1]
+            event.preventDefault()
+            song.entryAssignment.entryId = input.value
+            if (nextInput) nextInput.focus()
+          }
+        }
+      }
+    </script>
+
+    <script src="https://unpkg.com/vue@2.6.10/dist/vue.js"></script>
+    <script src="https://unpkg.com/vue-router@3.1.3/dist/vue-router.js"></script>
+    <script src="https://unpkg.com/bootstrap-vue@2.0.0-rc.28/dist/bootstrap-vue.min.js"></script>
+
+    <script>
+      for (const [k, v] of Object.entries(components)) Vue.component(k, v)
+      window.appInstance = startApp()
     </script>
   </body>
 </html>

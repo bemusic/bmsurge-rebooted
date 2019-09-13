@@ -182,7 +182,10 @@ cli()
         const songs = await client
           .db()
           .collection('songs')
-          .find({ 'renderResult.uploadedAt': { $exists: true }, disabled: { $ne: true } })
+          .find({
+            'renderResult.uploadedAt': { $exists: true },
+            disabled: { $ne: true }
+          })
           .toArray()
         const updatedTimeMap = new Map(
           songs.map(s => [String(s._id), s.renderedAt])
@@ -244,7 +247,7 @@ cli()
     app.use(express.static(__dirname + '/../static'))
     app.get('/report.json', async (req, res, next) => {
       try {
-        const report = await generateReport(client)
+        const report = await generateReport(client, req.query)
         res.json(report)
       } catch (e) {
         next(e)

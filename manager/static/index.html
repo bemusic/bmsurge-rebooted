@@ -106,24 +106,7 @@
         },
         async mounted() {
           window.currentEventPage = this
-          try {
-            const eventId = this.eventId
-            const url = '/report.json?eventId=' + eventId
-            const report = await fetch(url).then(r => r.json())
-            this.report = {
-              songs: report.songs.map(song =>
-                Object.assign(song, {
-                  entryAssignment: this.getEntryAssignmentForSongId(
-                    song._id,
-                    song.entryId
-                  )
-                })
-              ),
-              event: report.events.find(e => e._id === eventId)
-            }
-          } catch (e) {
-            alert(e)
-          }
+          this.loadData()
         },
         computed: {
           entries() {
@@ -157,6 +140,26 @@
           }
         },
         methods: {
+          async loadData() {
+            try {
+              const eventId = this.eventId
+              const url = '/report.json?eventId=' + eventId
+              const report = await fetch(url).then(r => r.json())
+              this.report = {
+                songs: report.songs.map(song =>
+                  Object.assign(song, {
+                    entryAssignment: this.getEntryAssignmentForSongId(
+                      song._id,
+                      song.entryId
+                    )
+                  })
+                ),
+                event: report.events.find(e => e._id === eventId)
+              }
+            } catch (e) {
+              alert(e)
+            }
+          },
           getEntryAssignmentForSongId(songId, defaultValue = null) {
             if (!this.songEntryAssignmentMap.has(songId)) {
               this.songEntryAssignmentMap.set(songId, {
@@ -181,9 +184,7 @@
           async save() {
             const mappings = this.items
               .filter(
-                s =>
-                  s.entryAssignment.entryId &&
-                  (s.entryAssignment.entryId || '') !== (s.entryId || '')
+                s => (s.entryAssignment.entryId || '') !== (s.entryId || '')
               )
               .map(s => ({
                 songId: s._id,
@@ -199,6 +200,7 @@
             })
             const text = await response.text()
             alert(text)
+            this.loadData()
           },
           autoMatch() {
             const items = this.renderedItems
@@ -248,7 +250,9 @@
                 {{ song.selectedChart.info.title }}
               </span>
             </td>
-            <td>
+            <td
+              :class="{'table-warning': (song.entryAssignment.entryId || '') !== (song.entryId || '')}"
+            >
               <template v-if="song.entryAssignment.entryId">
                 {{ song.entryAssignment.entryId }}
               </template>

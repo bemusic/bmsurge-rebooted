@@ -53,6 +53,12 @@
     </script>
 
     <template id="event-page">
+      <event-view
+        :event-id="$route.params.eventId"
+        :key="$route.params.eventId"
+      ></event-view>
+    </template>
+    <template id="event-view-template">
       <div>
         <template v-if="report">
           <h2>Unfinished items ({{ unfinishedItems.length }})</h2>
@@ -86,133 +92,139 @@
       routes.push({
         path: '/event/:eventId',
         component: {
-          template: '#event-page',
-          data() {
-            return {
-              report: null,
-              songEntryAssignmentMap: new Map()
-            }
-          },
-          async mounted() {
-            window.currentEventPage = this
-            try {
-              const eventId = this.$route.params.eventId
-              const url = '/report.json?eventId=' + eventId
-              const report = await fetch(url).then(r => r.json())
-              this.report = {
-                songs: report.songs.map(song =>
-                  Object.assign(song, {
-                    entryAssignment: this.getEntryAssignmentForSongId(
-                      song._id,
-                      song.entryId
-                    )
-                  })
-                ),
-                event: report.events.find(e => e._id === eventId)
-              }
-            } catch (e) {
-              alert(e)
-            }
-          },
-          computed: {
-            entries() {
-              const event = this.report.event
-              return (event && event.entries) || []
-            },
-            items() {
-              return this.report.songs
-            },
-            unfinishedItems() {
-              return this.items.filter(
-                s => s.status === 'error' || s.status === 'pending'
-              )
-            },
-            renderedItems() {
-              return this.items.filter(s => s.status === 'done')
-            },
-            assignedItems() {
-              return this.renderedItems.filter(s => !!s.entryAssignment.entryId)
-            },
-            unassignedItems() {
-              return this.renderedItems.filter(s => !s.entryAssignment.entryId)
-            },
-            availableEntries() {
-              const assignedEntryIds = new Set(
-                this.assignedItems.map(s => s.entryAssignment.entryId)
-              )
-              return this.entries.filter(e => !assignedEntryIds.has(e.entryId))
-            }
-          },
-          methods: {
-            getEntryAssignmentForSongId(songId, defaultValue = null) {
-              if (!this.songEntryAssignmentMap.has(songId)) {
-                this.songEntryAssignmentMap.set(songId, {
-                  entryId: defaultValue
-                })
-              }
-              return this.songEntryAssignmentMap.get(songId)
-            },
-            statusBadge(status) {
-              return {
-                done: 'badge-success',
-                error: 'badge-danger',
-                pending: 'badge-secondary'
-              }[status]
-            },
-            songClick(song) {
-              console.log(JSON.parse(JSON.stringify(song)))
-            },
-            entryName(entry) {
-              return `[${entry.genre}] ${entry.artist} - ${entry.title}`
-            },
-            async save() {
-              const mappings = this.items
-                .filter(
-                  s =>
-                    s.entryAssignment.entryId &&
-                    (s.entryAssignment.entryId || '') !== (s.entryId || '')
-                )
-                .map(s => ({
-                  songId: s._id,
-                  entryId: s.entryAssignment.entryId || null
-                }))
-              const response = await fetch('/entry-mapping', {
-                method: 'PATCH',
-                headers: {
-                  Accept: 'application/json',
-                  'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ mappings })
-              })
-              const text = await response.text()
-              alert(text)
-            },
-            autoMatch() {
-              const items = this.renderedItems
-              const entries = this.entries
-
-              const matches = []
-              for (const song of items) {
-                const title = song.selectedChart.info.title
-                const entryMatches = entries.filter(e => e.title === title)
-                if (entryMatches.length === 1) {
-                  const [entry] = entryMatches
-                  const itemMatches = items.filter(
-                    s => s.selectedChart.info.title === entry.title
+          template: '#event-page'
+        }
+      })
+      components['event-view'] = {
+        template: '#event-view-template',
+        props: { eventId: String },
+        data() {
+          return {
+            report: null,
+            songEntryAssignmentMap: new Map()
+          }
+        },
+        async mounted() {
+          window.currentEventPage = this
+          try {
+            const eventId = this.eventId
+            const url = '/report.json?eventId=' + eventId
+            const report = await fetch(url).then(r => r.json())
+            this.report = {
+              songs: report.songs.map(song =>
+                Object.assign(song, {
+                  entryAssignment: this.getEntryAssignmentForSongId(
+                    song._id,
+                    song.entryId
                   )
-                  if (itemMatches.length === 1) {
-                    matches.push({ entry, song })
-                  }
+                })
+              ),
+              event: report.events.find(e => e._id === eventId)
+            }
+          } catch (e) {
+            alert(e)
+          }
+        },
+        computed: {
+          entries() {
+            const event = this.report.event
+            return (event && event.entries) || []
+          },
+          items() {
+            return this.report.songs
+          },
+          unfinishedItems() {
+            return this.items.filter(
+              s => s.status === 'error' || s.status === 'pending'
+            )
+          },
+          renderedItems() {
+            return this.items.filter(s => s.status === 'done')
+          },
+          assignedItems() {
+            return this.renderedItems.filter(s => !!s.entryAssignment.entryId)
+          },
+          unassignedItems() {
+            return this.renderedItems.filter(s => !s.entryAssignment.entryId)
+          },
+          availableEntries() {
+            const assignedEntryIds = new Set(
+              this.items
+                .filter(s => !!s.entryAssignment.entryId)
+                .map(s => s.entryAssignment.entryId)
+            )
+            return this.entries.filter(e => !assignedEntryIds.has(e.entryId))
+          }
+        },
+        methods: {
+          getEntryAssignmentForSongId(songId, defaultValue = null) {
+            if (!this.songEntryAssignmentMap.has(songId)) {
+              this.songEntryAssignmentMap.set(songId, {
+                entryId: defaultValue
+              })
+            }
+            return this.songEntryAssignmentMap.get(songId)
+          },
+          statusBadge(status) {
+            return {
+              done: 'badge-success',
+              error: 'badge-danger',
+              pending: 'badge-secondary'
+            }[status]
+          },
+          songClick(song) {
+            console.log(JSON.parse(JSON.stringify(song)))
+          },
+          entryName(entry) {
+            return `[${entry.genre}] ${entry.artist} - ${entry.title}`
+          },
+          async save() {
+            const mappings = this.items
+              .filter(
+                s =>
+                  s.entryAssignment.entryId &&
+                  (s.entryAssignment.entryId || '') !== (s.entryId || '')
+              )
+              .map(s => ({
+                songId: s._id,
+                entryId: s.entryAssignment.entryId || null
+              }))
+            const response = await fetch('/entry-mapping', {
+              method: 'PATCH',
+              headers: {
+                Accept: 'application/json',
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({ mappings })
+            })
+            const text = await response.text()
+            alert(text)
+          },
+          autoMatch() {
+            const items = this.renderedItems
+            const entries = this.entries
+
+            const matches = []
+            for (const song of items) {
+              const title = song.selectedChart.info.title
+              const entryMatches = entries.filter(e => e.title === title)
+              if (entryMatches.length === 1) {
+                const [entry] = entryMatches
+                const itemMatches = items.filter(
+                  s => s.selectedChart.info.title === entry.title
+                )
+                if (itemMatches.length === 1) {
+                  matches.push({ entry, song })
                 }
               }
+            }
 
-              for (const { entry, song } of matches) {
-                song.entryAssignment.entryId = entry.entryId
-              }
+            for (const { entry, song } of matches) {
+              song.entryAssignment.entryId = entry.entryId
             }
           }
         }
-      })
+      }
     </script>
 
     <template id="song-table-template">

@@ -58,19 +58,25 @@
           <h2>Unfinished items ({{ unfinishedItems.length }})</h2>
           <song-table :songs="unfinishedItems"></song-table>
           <h2>Unassigned items ({{ unassignedItems.length }})</h2>
+          <p>Available entries to match: {{ availableEntries.length }}</p>
           <p>
-            <p>
-              Available entries to match: {{availableEntries.length}}
-            </p>
             <button class="btn btn-sm btn-primary" @click="autoMatch">
-              Auto-Match
+              Auto-match
+            </button>
+            <button class="btn btn-sm btn-primary" @click="save">
+              Save changes
             </button>
           </p>
           <song-table :songs="unassignedItems"></song-table>
           <h2>Assigned items ({{ assignedItems.length }})</h2>
           <song-table :songs="assignedItems"></song-table>
           <datalist id="available-entries">
-            <option v-for="entry in availableEntries" :key="entry.entryId" :value="entry.entryId">{{ entryName(entry) }}</option>
+            <option
+              v-for="entry in availableEntries"
+              :key="entry.entryId"
+              :value="entry.entryId"
+              >{{ entryName(entry) }}</option
+            >
           </datalist>
         </template>
         <div v-else>Loading report...</div>
@@ -96,7 +102,10 @@
               this.report = {
                 songs: report.songs.map(song =>
                   Object.assign(song, {
-                    entryAssignment: this.getEntryAssignmentForSongId(song._id)
+                    entryAssignment: this.getEntryAssignmentForSongId(
+                      song._id,
+                      song.entryId
+                    )
                   })
                 ),
                 event: report.events.find(e => e._id === eventId)
@@ -128,20 +137,18 @@
               return this.renderedItems.filter(s => !s.entryAssignment.entryId)
             },
             availableEntries() {
-              const assignedEntryIds = new Set(this.assignedItems.map(s => s.entryAssignment.entryId))
+              const assignedEntryIds = new Set(
+                this.assignedItems.map(s => s.entryAssignment.entryId)
+              )
               return this.entries.filter(e => !assignedEntryIds.has(e.entryId))
             }
           },
           methods: {
-            getEntryAssignmentForSongId(songId) {
+            getEntryAssignmentForSongId(songId, defaultValue = null) {
               if (!this.songEntryAssignmentMap.has(songId)) {
-                this.songEntryAssignmentMap.set(
-                  songId,
-                  // new Vue({
-                  //   data: { state: { entryId: null } }
-                  // }).state
-                  { entryId: null }
-                )
+                this.songEntryAssignmentMap.set(songId, {
+                  entryId: defaultValue
+                })
               }
               return this.songEntryAssignmentMap.get(songId)
             },
@@ -157,6 +164,28 @@
             },
             entryName(entry) {
               return `[${entry.genre}] ${entry.artist} - ${entry.title}`
+            },
+            async save() {
+              const mappings = this.items
+                .filter(
+                  s =>
+                    s.entryAssignment.entryId &&
+                    (s.entryAssignment.entryId || '') !== (s.entryId || '')
+                )
+                .map(s => ({
+                  songId: s._id,
+                  entryId: s.entryAssignment.entryId || null
+                }))
+              const response = await fetch('/entry-mapping', {
+                method: 'PATCH',
+                headers: {
+                  Accept: 'application/json',
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ mappings })
+              })
+              const text = await response.text()
+              alert(text)
             },
             autoMatch() {
               const items = this.renderedItems
@@ -209,11 +238,15 @@
             </td>
             <td>
               <template v-if="song.entryAssignment.entryId">
-                  {{ song.entryAssignment.entryId }}
+                {{ song.entryAssignment.entryId }}
               </template>
               <template v-else>
                 <form @submit="setEntryID($event, song)">
-                  <input list='available-entries' name='entryId' class='entry-input' />
+                  <input
+                    list="available-entries"
+                    name="entryId"
+                    class="entry-input"
+                  />
                 </form>
               </template>
             </td>

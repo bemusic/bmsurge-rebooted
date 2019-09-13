@@ -2,7 +2,7 @@
 const { cli, logger, invariant } = require('tkt')
 const fs = require('fs')
 const path = require('path')
-const { MongoClient } = require('mongodb')
+const { MongoClient, ObjectID } = require('mongodb')
 const Bluebird = require('bluebird')
 const axios = require('axios').default
 const uuidv4 = require('uuid/v4')
@@ -154,7 +154,7 @@ cli()
   .command('report', 'Generates a report', {}, async args => {
     const client = await connectToMongoDB()
     try {
-      const report = await generateReport(client)
+      const report = await generateReport(client, args)
       console.log(JSON.stringify(report, null, 2))
     } finally {
       client.close()
@@ -245,6 +245,25 @@ cli()
     const express = require('express')
     const app = express()
     app.use(express.static(__dirname + '/../static'))
+    app.use(require('body-parser').json())
+    app.patch('/entry-mapping', async (req, res, next) => {
+      try {
+        const operations = req.body.mappings.map(mapping => ({
+          updateOne: {
+            filter: { _id: new ObjectID(mapping.songId) },
+            update: { $set: { entryId: String(mapping.entryId) } },
+            upsert: false
+          }
+        }))
+        const result = await client
+          .db()
+          .collection('songs')
+          .bulkWrite(operations)
+        res.json(result)
+      } catch (e) {
+        next(e)
+      }
+    })
     app.get('/report.json', async (req, res, next) => {
       try {
         const report = await generateReport(client, req.query)

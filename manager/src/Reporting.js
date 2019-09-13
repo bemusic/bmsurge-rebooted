@@ -37,6 +37,7 @@ exports.generateReport = async function generateReport(client, args) {
       return {
         _id: s._id,
         eventId: s.eventId,
+        entryId: s.entryId,
         addedAt: s.addedAt,
         renderedAt: s.renderedAt,
         status,

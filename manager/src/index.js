@@ -8,6 +8,7 @@ const axios = require('axios').default
 const uuidv4 = require('uuid/v4')
 const { generateReport } = require('./Reporting')
 const { generatePlaylist } = require('./Playlist')
+const { generateSonglist } = require('./Songlist')
 
 require('dotenv').config()
 cli()
@@ -179,31 +180,7 @@ cli()
       const log = logger('songlist')
       const client = await connectToMongoDB()
       try {
-        const songs = await client
-          .db()
-          .collection('songs')
-          .find({
-            'renderResult.uploadedAt': { $exists: true },
-            disabled: { $ne: true }
-          })
-          .toArray()
-        const updatedTimeMap = new Map(
-          songs.map(s => [String(s._id), s.renderedAt])
-        )
-        const songlist = songs.map(s => {
-          const chart = s.renderResult.selectedChart
-          return {
-            songId: String(s._id),
-            fileId: s.renderResult.operationId,
-            genre: chart.info.genre,
-            title: chart.info.title,
-            artist: chart.info.artist,
-            md5: chart.md5,
-            duration: s.renderResult.wavSizeAfterTrimEnd / (44100 * 2 * 2),
-            event: s.eventId,
-            updatedAt: s.renderedAt
-          }
-        })
+        const { songlist, updatedTimeMap } = await generateSonglist(client)
         log.info('Found %s songs', songlist.length)
         if (args.output) {
           const json = Buffer.from(

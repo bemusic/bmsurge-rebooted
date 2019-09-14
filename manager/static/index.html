@@ -175,7 +175,8 @@
           getEntryAssignmentForSongId(songId, defaultValue = null) {
             if (!this.songEntryAssignmentMap.has(songId)) {
               this.songEntryAssignmentMap.set(songId, {
-                entryId: defaultValue
+                entryId: defaultValue,
+                bailReason: ''
               })
             }
             return this.songEntryAssignmentMap.get(songId)
@@ -239,7 +240,14 @@
                     return
                   }
                   used.add(entry.entryId)
+                } else {
+                  song.entryAssignment.bailReason =
+                    'Multiple songs matched matched entry'
                 }
+              } else if (entryMatches.length === 0) {
+                song.entryAssignment.bailReason = 'No entries matched'
+              } else {
+                song.entryAssignment.bailReason = 'Multiple entries matched'
               }
             }
 
@@ -295,7 +303,8 @@
                     list="available-entries"
                     name="entryId"
                     class="entry-input"
-                  />
+                  /><br />
+                  {{ song.entryAssignment.bailReason }}
                 </form>
               </template>
             </td>

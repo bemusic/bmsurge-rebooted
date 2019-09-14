@@ -1,3 +1,5 @@
+const _ = require('lodash')
+
 /**
  * @param {import("mongodb").MongoClient} client
  */
@@ -24,6 +26,8 @@ exports.generateSonglist = async function generateSonglist(client) {
     ])
   )
   const updatedTimeMap = new Map(songs.map(s => [String(s._id), s.renderedAt]))
+  /** @type {ScoreEntry[]} */
+  const scoreList = []
   const songlist = songs.map(s => {
     const chart = s.renderResult.selectedChart
     const entryInfo = {}
@@ -35,6 +39,14 @@ exports.generateSonglist = async function generateSonglist(client) {
       if (entry) {
         entryInfo.entryId = s.entryId
         entryInfo.entryUrl = entry.url
+        if (entry.impressions && entry.total) {
+          scoreList.push({
+            songId: String(s._id),
+            eventId: s.eventId,
+            impressions: entry.impressions,
+            total: entry.total
+          })
+        }
       }
     }
     return {
@@ -47,8 +59,50 @@ exports.generateSonglist = async function generateSonglist(client) {
       duration: s.renderResult.wavSizeAfterTrimEnd / (44100 * 2 * 2),
       event: s.eventId,
       updatedAt: s.renderedAt,
+      weight: 1,
       ...entryInfo
     }
   })
+  const weightMap = new Map()
+  for (const [_eventId, scores] of Object.entries(
+    _.groupBy(scoreList, s => s.eventId)
+  )) {
+    const rankScorer = createRankScorer(scores)
+    const sortedRows = _.sortBy(
+      scores.map(s => ({ scoreEntry: s, score: rankScorer(s) })),
+      row => row.score
+    ).reverse()
+    let currentScore = Infinity
+    let currentWeight = Infinity
+    for (const [index, { scoreEntry, score }] of sortedRows.entries()) {
+      if (score < currentScore) {
+        currentScore = score
+        currentWeight = Math.pow(2, 1 - (index / sortedRows.length) * 2)
+      }
+      weightMap.set(scoreEntry.songId, currentWeight)
+    }
+  }
+  for (const song of songlist) {
+    if (weightMap.has(song.songId)) {
+      song.weight = weightMap.get(song.songId)
+    }
+  }
   return { updatedTimeMap, songlist }
+}
+
+/**
+ * @typedef {{
+ *   songId: string;
+ *   eventId: string;
+ *   total: number;
+ *   impressions: number;
+ * }} ScoreEntry
+ */
+
+/**
+ * @param {ScoreEntry[]} scores
+ * @returns {(entry: ScoreEntry) => number}
+ */
+function createRankScorer(_scores) {
+  return s => s.total / s.impressions
 }

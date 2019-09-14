@@ -116,10 +116,10 @@ function getPublicSongPayload(info) {
     set: info.song.event || null,
     requested: info.requested || false,
     requesters: info.requesters || null,
-    eventTitle: info.eventTitle || null,
-    eventUrl: info.eventUrl || null,
-    entryId: info.entryId || null,
-    entryUrl: info.entryUrl || null
+    eventTitle: info.song.eventTitle || null,
+    eventUrl: info.song.eventUrl || null,
+    entryId: info.song.entryId || null,
+    entryUrl: info.song.entryUrl || null
   }
 }
 

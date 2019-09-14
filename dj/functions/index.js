@@ -113,7 +113,7 @@ function getPublicSongPayload(info) {
     event: info.song.event || null,
     duration: info.song.duration || null,
     md5: info.song.md5 || null,
-    set: info.song.event || null,
+    team: info.song.team || null,
     requested: info.requested || false,
     requesters: info.requesters || null,
     eventTitle: info.song.eventTitle || null,

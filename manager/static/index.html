@@ -309,10 +309,14 @@
         template: '#song-table-template',
         methods: {
           setEntryID(event, song) {
-            const inputs = Array.from(document.querySelectorAll('.entry-input'))
-            const input = event.target.entryId
-            const nextInput = inputs[inputs.indexOf(input) + 1]
             event.preventDefault()
+            const input = event.target.entryId
+            if (!this.entryMap.has(input.value)) {
+              alert('Invalid entry ID')
+              return
+            }
+            const inputs = Array.from(document.querySelectorAll('.entry-input'))
+            const nextInput = inputs[inputs.indexOf(input) + 1]
             song.entryAssignment.entryId = input.value
             if (nextInput) nextInput.focus()
           },

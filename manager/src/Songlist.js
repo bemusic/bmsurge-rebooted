@@ -39,13 +39,16 @@ exports.generateSonglist = async function generateSonglist(client) {
       if (entry) {
         entryInfo.entryId = s.entryId
         entryInfo.entryUrl = entry.url
+        entryInfo.team = entry.team
+        if (entry.title) entryInfo.title = entry.title
+        if (entry.artist) entryInfo.artist = entry.artist
+        if (entry.genre) entryInfo.genre = entry.genre
         if (entry.impressions && entry.total) {
           scoreList.push({
             songId: String(s._id),
             eventId: s.eventId,
             impressions: entry.impressions,
-            total: entry.total,
-            team: entry.team || undefined
+            total: entry.total
           })
         }
       }

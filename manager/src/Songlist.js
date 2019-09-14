@@ -44,7 +44,8 @@ exports.generateSonglist = async function generateSonglist(client) {
             songId: String(s._id),
             eventId: s.eventId,
             impressions: entry.impressions,
-            total: entry.total
+            total: entry.total,
+            team: entry.team || undefined
           })
         }
       }

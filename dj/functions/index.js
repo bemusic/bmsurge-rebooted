@@ -4,6 +4,7 @@ const functions = require('firebase-functions')
 const admin = require('firebase-admin')
 const _ = require('lodash')
 const QoS = require('./QoS')
+const { createWeightedIndexer } = require('./Weighter')
 
 admin.initializeApp()
 
@@ -69,7 +70,8 @@ exports.getSong = functions.https.onRequest(async (request, response) => {
     .sortBy(a => -requestCount(requests[a]))
     .filter(k => !recentlyPlayed.has(k))
     .value()[0]
-  const random = Math.floor(Math.random() * songlist.length)
+  const getIndex = createWeightedIndexer(songlist.map(s => s.weight || 1))
+  const random = getIndex(Math.random())
   const song =
     (fulfillableRequest &&
       songlist.filter(s => s.songId === fulfillableRequest)[0]) ||
@@ -113,7 +115,11 @@ function getPublicSongPayload(info) {
     md5: info.song.md5 || null,
     set: info.song.event || null,
     requested: info.requested || false,
-    requesters: info.requesters || null
+    requesters: info.requesters || null,
+    eventTitle: info.eventTitle || null,
+    eventUrl: info.eventUrl || null,
+    entryId: info.entryId || null,
+    entryUrl: info.entryUrl || null
   }
 }
 

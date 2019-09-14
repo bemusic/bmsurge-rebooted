@@ -1,6 +1,7 @@
 const Bsearch = require('bsearch')
 /**
  * @param {number[]} weights
+ * @returns {(fraction: number) => number}
  */
 exports.createWeightedIndexer = function createWeightedIndexer(weights) {
   /** @type {number[]} */

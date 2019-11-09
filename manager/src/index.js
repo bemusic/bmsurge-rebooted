@@ -65,6 +65,11 @@ cli()
     {
       retry: { type: 'boolean', desc: 'Retry previously failed archives' },
       force: { type: 'boolean', desc: 'Actually work', alias: ['f'] },
+      local: {
+        type: 'boolean',
+        desc: 'Use local renderer (http://localhost:4567) instead'
+      },
+      song: { type: 'string', desc: 'Song ID', alias: ['s'] },
       eventId: { type: 'string', desc: 'Filter by event', alias: ['e'] }
     },
     async args => {
@@ -72,15 +77,20 @@ cli()
       const client = await connectToMongoDB()
       try {
         const songsCollection = client.db().collection('songs')
-        const filter = args.eventId
+        const filter = args.song
+          ? { _id: new ObjectID(args.song) }
+          : args.eventId
           ? { eventId: args.eventId }
           : {}
         const found = await songsCollection
           .find({
             ...filter,
-            ...args.retry
+            ...(args.song
+              ? {}
+              : args.retry
               ? { 'renderResult.uploadedAt': { $exists: false } }
-              : { renderedAt: { $exists: false } }
+              : { renderedAt: { $exists: false } }),
+            disabled: { $ne: true }
           })
           .toArray()
         log.info('Found %s songs to work on.', found.length)
@@ -93,8 +103,11 @@ cli()
             const songLog = log.child(`${song._id}`)
             songLog.info('Start operation "%s"', operationId)
             try {
+              const workerUrlBase = args.local
+                ? 'http://localhost:4567'
+                : process.env.WORKER_URL
               const response = await axios.put(
-                `${process.env.WORKER_URL}/renders/${operationId}`,
+                `${workerUrlBase}/renders/${operationId}`,
                 { url: song.url },
                 {
                   timeout: 900e3,
@@ -135,7 +148,7 @@ cli()
               )
             }
           },
-          { concurrency: 128 }
+          { concurrency: args.local ? 1 : 128 }
         )
       } finally {
         client.close()

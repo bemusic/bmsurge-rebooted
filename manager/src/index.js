@@ -64,19 +64,24 @@ cli()
     'Invokes the worker to process BMS archives',
     {
       retry: { type: 'boolean', desc: 'Retry previously failed archives' },
-      force: { type: 'boolean', desc: 'Actually work', alias: ['f'] }
+      force: { type: 'boolean', desc: 'Actually work', alias: ['f'] },
+      eventId: { type: 'string', desc: 'Filter by event', alias: ['e'] }
     },
     async args => {
       const log = logger('work')
       const client = await connectToMongoDB()
       try {
         const songsCollection = client.db().collection('songs')
+        const filter = args.eventId
+          ? { eventId: args.eventId }
+          : {}
         const found = await songsCollection
-          .find(
-            args.retry
+          .find({
+            ...filter,
+            ...args.retry
               ? { 'renderResult.uploadedAt': { $exists: false } }
               : { renderedAt: { $exists: false } }
-          )
+          })
           .toArray()
         log.info('Found %s songs to work on.', found.length)
         if (!args.force) return

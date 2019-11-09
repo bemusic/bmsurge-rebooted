@@ -222,6 +222,33 @@ cli()
       }
     }
   )
+  .command(
+    'disable <id> <reason>',
+    'Disables a song',
+    {
+      id: { type: 'string', desc: 'Song ID' },
+      reason: { type: 'string', desc: 'Reason for disabling' }
+    },
+    async args => {
+      const log = logger('work')
+      const client = await connectToMongoDB()
+      try {
+        const songsCollection = client.db().collection('songs')
+        await songsCollection.updateOne(
+          { _id: new ObjectID(args.id) },
+          {
+            $set: {
+              disabled: true,
+              disableReason: args.reason,
+              disabldAt: new Date()
+            }
+          }
+        )
+      } finally {
+        client.close()
+      }
+    }
+  )
   .command('server', 'Runs a server', {}, async args => {
     const client = await connectToMongoDB()
     const express = require('express')

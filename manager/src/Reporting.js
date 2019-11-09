@@ -41,6 +41,7 @@ exports.generateReport = async function generateReport(client, args) {
         addedAt: s.addedAt,
         renderedAt: s.renderedAt,
         status,
+        duration: renderResult ? renderResult.wavSizeAfterTrimEnd / (44100 * 2 * 2) : null,
         packageFile: decodeURIComponent(s.url.split('/').pop()),
         selectedChart: selectedChart,
         md5s: ((renderResult && renderResult.availableCharts) || []).map(

@@ -8,6 +8,7 @@ exports.generateReport = async function generateReport(client, args) {
   if (args.eventId) {
     songFilters.eventId = eventFilters._id = String(args.eventId)
   }
+  songFilters.disabled = { $ne: true }
   const songs = await client
     .db()
     .collection('songs')

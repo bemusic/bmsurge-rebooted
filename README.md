@@ -203,3 +203,66 @@ to the library. This assumes that all components set up already.
     to render because they require more than 2 gigabytes of RAM to process. To
     fix this I have to run a renderer worker locally (`./scripts/run server` in
     `worker`) and then `node src/index.js work -f -s <song_id> --local`.
+
+- **Adding event metadata.** I use MongoDB VS Code extension and open a MongoDB
+  Playground. Then I run a MongoDB Shell script to insert new event information.
+  The entries can be scraped from the venue site using
+  [Data extration scripts](https://github.com/bemusic/bmsurge-rebooted/wiki/Event-data-extraction-scripts)
+  posted on the wiki.
+
+  ```js
+  use('bmsurge')
+  db.events.insertOne({
+    _id: 'mutualfaith3',
+    date: '2020-08-02',
+    title: 'Mutual Faith 3',
+    url: 'https://revlishsart.wixsite.com/mutualfaith3',
+    entries: [...]
+  })
+  ```
+
+- **Rendered-song-to-entry matching.** We want to display links to the
+  corresponding BMS submission entries in the venue when we play it on the
+  radio. So we need to match each rendered song to an entry in the BMS venue.
+
+  With the management server open, I can see the songs that needs matching in
+  **Unassigned items** section. The **Available entries to match** number
+  verifies that the event metadata (the previous step) is properly entered to
+  the database (otherwise it displays 0).
+
+  ![](./docs/images/admin-unassigned.png)
+
+  To speed up this process, I can click on the **Auto-match** button to match
+  the BMS header data to the entry automatically.
+
+  In this example I can now see that 36 entries out of 39 are matched properly,
+  while 3 are not and require manual matching.
+
+  ![](./docs/images/admin-automatch.png)
+
+  Non-matching happens when the metadata in the BMS headers does not match the
+  metadata in the venue. Maybe they are spelled differently or have “(BMS Edit)”
+  added to the title.
+
+  Once everything is matched up, I can click the **Save changes** button to save
+  everything to the songs database.
+
+- **Synchronize the rendered songs to the seedbox.** The renderer worker script
+  start the rendered files in Google Cloud Storage. However, there are costs
+  associated with bandwidth these files from the radio station. To reduce the
+  operation costs, I synchronize the files from Google Cloud to my seedbox, and
+  configure the radio broadcast to stream songs from the seedbox instead.
+  `gsutil -m rsync -d gs://bmsurge-renders/ public/mp3/`
+
+- **Update the songlist on the radio station.** To keep things decoupled (and to
+  save costs), the broadcasting system (`dj`) does not read from the database
+  directly. It said it has an internal songlist which must be updated when we
+  update the song library.
+  `node src/index.js songlist --update -o private/_songlist.json`
+
+- **Update the search index.** This allows songs to be requested.
+  `node src/index.js songlist --index='2020-08-01T00:00:00.000Z' --update`
+
+- **Update the server status.** I run a script that reads the song list and
+  updates the server status accordingly. The source code for that script is not
+  in this repository yet.

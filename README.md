@@ -73,3 +73,133 @@ MP3, and uploads it to Google Cloud Storage.
 
 Manages the song database and invokes the worker when new BMS songs need to be
 processed.
+
+## Management
+
+This section describes how I manage the radio station, such as adding new songs
+to the library. This assumes that all components set up already.
+
+- **Download the BMS package.** I would download an BMS Event’s package. I
+  usually do this on a seedbox, because there are more storage on there and the
+  network speed is much better.
+
+  - For Google Drive links, I use the
+    [`gdrive_download`](https://gist.github.com/darencard/079246e43e3c4b97e373873c6c9a3798)
+    script.
+
+  - For Dropbox links, I just use plain ol `wget`.
+
+  - For other links that needs manual downloads, I use a cloud VPS to download
+    the package (via remote desktop) and then transfer it over to the seedbox.
+
+- **Extract the BMS package.** I need to repack the BMS package into
+  one-zip-file-per-song format. So first, I have to extract the whole package.
+
+  - For `.rar` or `.7z` archive, I use the `7z` command-line tool. This kind of
+    archives are pretty easy to work with, since they have better support for
+    Unicode file names.
+
+  - For `.zip` archive, this is a bit tricky because the files may be encoded in
+    an arbitrary encoding (most frequently CP932). To add to the offense, the
+    encoding used is not stored in the zip file’s header and decompression tools
+    doesn't provide a switch to specify the encoding.
+
+    For this I use `bsdtar` to first extract the files: `bsdtar xvf <file>.zip`.
+    I use it because it doesn't attempt to convert the filename’s encoding. It
+    treats the file name as binary string, and writes it as-is to the file
+    system.
+
+    Then, I use `convmv` to fix the encoding issue:
+    `convmv -f CP932 -t UTF-8 -r .`. `convmv` is actually pretty smart, and will
+    skip converting filenames if it is already in utf-8 encoding.
+
+- **Re-package as one-song-per-zip-file archives.** Given the extracted files in
+  the directory `raw` (relative to the current working directory), I run this
+  Ruby script to put them in `zip`.
+
+  ```ruby
+  require 'pathname'
+  require 'open3'
+
+  files = Dir.glob("raw/**/*.{bms,bme,bml,bmson,pms}", File::FNM_CASEFOLD | File::FNM_EXTGLOB)
+  dirs = files.reject { |f| Dir.exist?(f) }.map { |f| File.dirname(f) }.uniq
+  dirs = dirs.reject { |d| dirs.any? { |e| d.start_with?(e + '/') } }
+  dirs.sort!
+
+  def make_temp_name
+    Pathname.new('tmp').mkpath
+    Pathname.new('tmp').join("tmp-#{Time.now.to_f}.zip").to_s
+  end
+
+  class Task
+    def initialize(in_dir)
+      @in_dir = in_dir
+    end
+    def output
+      'zip/' + @in_dir.sub(/^raw\//, '').gsub('/', '__') + '.zip'
+    end
+    def to_s
+      "Converting #{@in_dir} => #{output}"
+    end
+    def run!
+      if !File.exist?(output)
+        Pathname.new(output).parent.mkpath
+        temp = make_temp_name
+        # , "-mx=0"
+        system "7z", "a", temp, "./#{@in_dir}/*" or raise "Task #{self} failed: 7z error"
+        system "mv", temp, output or raise "Task #{self} failed: mv error"
+      end
+    end
+  end
+
+  tasks = dirs.map { |d| Task.new(d) }
+  tasks.each_with_index do |t, i|
+    puts "[#{i + 1}/#{tasks.length}] #{t}"
+    t.run!
+  end
+  ```
+
+- **Make the zip file downloadable.** Each ZIP file will need a public URL. I do
+  this by symlinking the `zip` directory to the `public_html` directory on the
+  seedbox.
+
+- **Generate a URL list.** I then create a `.json` file with the list of URLs to
+  import. For example, `mutualfaith3.urls.json` would look like this:
+
+  ```json
+  [
+    "https://<seedbox-host>/bms/mutualfaith3/5C01-aberrant_sorcery.zip",
+    "https://<seedbox-host>/bms/mutualfaith3/Aradia.zip",
+    "https://<seedbox-host>/bms/mutualfaith3/Balam_katastrophe%5BOverKill%5D.zip",
+    ...
+  ]
+  ```
+
+- **Import the URLs into the song database.** Inside `manager` I run:
+  `node src/index.js import -f <event>.urls.mp3`
+
+- **Perform the batch rendering.** These are done in `manager` folder.
+
+  - First I run `node src/index.js work -f` to process the new songs.
+
+  - Some songs will fail to render the first time but will do just fine the
+    second time. Run `node src/index.js work -f --retry` to attempt re-rendering
+    failed songs.
+
+  This will account for more than 95% of the songs. The are few songs that needs
+  to be fixed manually.
+
+- **Perform manual (per-song) rendering.** I run `node src/index.js server` (in
+  another terminal tab) to open a web server with a UI that lets me inspect the
+  rendering result. I go to `http://localhost:8080/#/event/<event>`
+
+  It will show the songs that are not rendered.
+
+  ![](./docs/images/admin-unrendered.png)
+
+  - To render them on the cloud, I run `node src/index.js work -f -s <song_id>`.
+
+  - Due to Google Cloud Run’s memory limitation (of 2 GB), some songs will fail
+    to render because they require more than 2 gigabytes of RAM to process. To
+    fix this I have to run a renderer worker locally (`./scripts/run server` in
+    `worker`) and then `node src/index.js work -f -s <song_id> --local`.

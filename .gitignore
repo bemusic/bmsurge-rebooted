@@ -129,5 +129,6 @@ Temporary Items
 tmp
 private
 .env
+.envrc
 # Local Netlify folder
 .netlify

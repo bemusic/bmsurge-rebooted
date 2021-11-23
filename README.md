@@ -175,8 +175,16 @@ to the library. This assumes that all components set up already.
   ]
   ```
 
+  To automate this process, I put the zip file on the seedbox web server (which
+  generates a directory listing) and then run the command in `manager`
+  directory:
+
+  ```sh
+  ruby scripts/scrape_urls.rb <event>
+  ```
+
 - **Import the URLs into the song database.** Inside `manager` I run:
-  `node src/index.js import -f <event>.urls.mp3`
+  `node src/index.js import -f <event>.urls.json`
 
 - **Perform the batch rendering.** These are done in `manager` folder.
 
@@ -203,6 +211,13 @@ to the library. This assumes that all components set up already.
     to render because they require more than 2 gigabytes of RAM to process. To
     fix this I have to run a renderer worker locally (`./scripts/run server` in
     `worker`) and then `node src/index.js work -f -s <song_id> --local`.
+
+    To run worker server locally for the first time:
+
+    - Create `worker/.env` with relevant environment variables.
+    - Create `worker/private` directory and put in the service account key file
+      in there.
+    - Run in `worker` run `./scripts/build` to build Docker image.
 
 - **Adding event metadata.** I use MongoDB VS Code extension and open a MongoDB
   Playground. Then I run a MongoDB Shell script to insert new event information.

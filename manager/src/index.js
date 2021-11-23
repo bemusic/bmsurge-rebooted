@@ -18,14 +18,14 @@ cli()
     {
       file: {
         desc: 'JSON file of URLs, filename should be *.urls.json',
-        type: 'string'
+        type: 'string',
       },
       f: {
         desc: 'Apply the changes',
-        type: 'boolean'
-      }
+        type: 'boolean',
+      },
     },
-    async args => {
+    async (args) => {
       const eventId = path.basename(args.file, '.urls.json')
       invariant(
         eventId.match(/^[a-z0-9]+$/),
@@ -34,14 +34,14 @@ cli()
       )
       const log = logger('import')
       const operations = JSON.parse(fs.readFileSync(args.file, 'utf8')).map(
-        url => ({
+        (url) => ({
           updateOne: {
             filter: { url },
             update: {
-              $setOnInsert: { url, eventId: eventId, addedAt: new Date() }
+              $setOnInsert: { url, eventId: eventId, addedAt: new Date() },
             },
-            upsert: true
-          }
+            upsert: true,
+          },
         })
       )
       log.info({ docs: operations }, 'Calculated operations to perform...')
@@ -67,12 +67,12 @@ cli()
       force: { type: 'boolean', desc: 'Actually work', alias: ['f'] },
       local: {
         type: 'boolean',
-        desc: 'Use local renderer (http://localhost:4567) instead'
+        desc: 'Use local renderer (http://localhost:4567) instead',
       },
       song: { type: 'string', desc: 'Song ID', alias: ['s'] },
-      eventId: { type: 'string', desc: 'Filter by event', alias: ['e'] }
+      eventId: { type: 'string', desc: 'Filter by event', alias: ['e'] },
     },
-    async args => {
+    async (args) => {
       const log = logger('work')
       const client = await connectToMongoDB()
       try {
@@ -90,14 +90,14 @@ cli()
               : args.retry
               ? { 'renderResult.uploadedAt': { $exists: false } }
               : { renderedAt: { $exists: false } }),
-            disabled: { $ne: true }
+            disabled: { $ne: true },
           })
           .toArray()
         log.info('Found %s songs to work on.', found.length)
         if (!args.force) return
         await Bluebird.map(
           found,
-          async song => {
+          async (song) => {
             // @ts-ignore
             const operationId = uuidv4()
             const songLog = log.child(`${song._id}`)
@@ -112,14 +112,14 @@ cli()
                 {
                   timeout: 900e3,
                   responseType: 'text',
-                  transformResponse: undefined
+                  transformResponse: undefined,
                 }
               )
               songLog.info('Operation "%s" finished', operationId)
               const result = JSON.parse(
                 response.data
                   .split('\n')
-                  .filter(r => r.trim())
+                  .filter((r) => r.trim())
                   .pop()
               )
               await songsCollection.updateOne(
@@ -127,8 +127,8 @@ cli()
                 {
                   $set: {
                     renderResult: result,
-                    renderedAt: new Date()
-                  }
+                    renderedAt: new Date(),
+                  },
                 }
               )
             } catch (error) {
@@ -142,8 +142,8 @@ cli()
                       (error.response
                         ? `\nResponse: ${error.response.data}`
                         : ''),
-                    renderedAt: new Date()
-                  }
+                    renderedAt: new Date(),
+                  },
                 }
               )
             }
@@ -159,9 +159,9 @@ cli()
     'playlist',
     'Prints the URLs of the songs as an M3U playlist',
     {
-      eventId: { type: 'string', alias: ['e'], description: 'Filter by event' }
+      eventId: { type: 'string', alias: ['e'], description: 'Filter by event' },
     },
-    async args => {
+    async (args) => {
       const client = await connectToMongoDB()
       try {
         console.log(await generatePlaylist(client, args))
@@ -170,7 +170,7 @@ cli()
       }
     }
   )
-  .command('report', 'Generates a report', {}, async args => {
+  .command('report', 'Generates a report', {}, async (args) => {
     const client = await connectToMongoDB()
     try {
       const report = await generateReport(client, args)
@@ -185,9 +185,9 @@ cli()
     {
       output: { alias: ['o'], type: 'string' },
       update: { alias: ['u'], type: 'boolean' },
-      index: { type: 'string' }
+      index: { type: 'string' },
     },
-    async args => {
+    async (args) => {
       const indexTime = args.index
       const indexDate = new Date(indexTime)
       if (indexTime && !+indexDate) {
@@ -203,7 +203,7 @@ cli()
         if (args.output) {
           const json = Buffer.from(
             '[' +
-              songlist.map(s => '\n  ' + JSON.stringify(s)).join(',') +
+              songlist.map((s) => '\n  ' + JSON.stringify(s)).join(',') +
               '\n]'
           )
           fs.writeFileSync(args.output, json)
@@ -218,7 +218,7 @@ cli()
         }
         if (args.index) {
           const filteredSonglist = songlist.filter(
-            s => +updatedTimeMap.get(s.songId) >= +indexDate
+            (s) => +updatedTimeMap.get(s.songId) >= +indexDate
           )
           log.info('Indexing %s songs', filteredSonglist.length)
           const response2 = await axios.patch(
@@ -240,9 +240,9 @@ cli()
     'Disables a song',
     {
       id: { type: 'string', desc: 'Song ID' },
-      reason: { type: 'string', desc: 'Reason for disabling' }
+      reason: { type: 'string', desc: 'Reason for disabling' },
     },
-    async args => {
+    async (args) => {
       const log = logger('work')
       const client = await connectToMongoDB()
       try {
@@ -253,8 +253,8 @@ cli()
             $set: {
               disabled: true,
               disableReason: args.reason,
-              disabldAt: new Date()
-            }
+              disabldAt: new Date(),
+            },
           }
         )
       } finally {
@@ -262,7 +262,7 @@ cli()
       }
     }
   )
-  .command('server', 'Runs a server', {}, async args => {
+  .command('server', 'Runs a server', {}, async (args) => {
     const client = await connectToMongoDB()
     const express = require('express')
     const app = express()
@@ -271,12 +271,12 @@ cli()
     app.use(require('body-parser').json())
     app.patch('/entry-mapping', async (req, res, next) => {
       try {
-        const operations = req.body.mappings.map(mapping => ({
+        const operations = req.body.mappings.map((mapping) => ({
           updateOne: {
             filter: { _id: new ObjectID(mapping.songId) },
             update: { $set: { entryId: String(mapping.entryId) } },
-            upsert: false
-          }
+            upsert: false,
+          },
         }))
         const result = await client
           .db()
@@ -312,7 +312,8 @@ async function connectToMongoDB() {
   log.info('Connecting to MongoDB...')
   const client = new MongoClient(
     process.env.MONGO_URL ||
-      invariant(false, 'Missing environment variable: MONGO_URL')
+      invariant(false, 'Missing environment variable: MONGO_URL'),
+    { useNewUrlParser: true }
   )
   await client.connect()
   log.info('Connected to MongoDB!')

@@ -279,5 +279,7 @@ to the library. This assumes that all components set up already.
   `node src/index.js songlist --index='2020-08-01T00:00:00.000Z' --update`
 
 - **Update the server status.** I run a script that reads the song list and
-  updates the server status accordingly. The source code for that script is not
-  in this repository yet.
+  updates the server status accordingly.
+
+  - To generate server status, in `manager`, run
+    `ruby scripts/generate_description.rb`.

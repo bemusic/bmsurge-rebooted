@@ -85,8 +85,8 @@ exports.generateSonglist = async function generateSonglist(client) {
     }
   }
   for (const song of songlist) {
-    if (song.eventId === 'bofxvii') {
-      song.weight = 100000
+    if (song.event === 'bofxvii') {
+      song.weight = 1000000
       continue
     }
     if (weightMap.has(song.songId)) {

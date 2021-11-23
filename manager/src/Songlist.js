@@ -9,26 +9,24 @@ exports.generateSonglist = async function generateSonglist(client) {
     .collection('songs')
     .find({
       'renderResult.uploadedAt': { $exists: true },
-      disabled: { $ne: true }
+      disabled: { $ne: true },
     })
     .toArray()
   const eventMap = new Map(
-    (await client
-      .db()
-      .collection('events')
-      .find({})
-      .toArray()).map(e => [
+    (await client.db().collection('events').find({}).toArray()).map((e) => [
       e._id,
       {
         ...e,
-        entryMap: new Map((e.entries || []).map(n => [n.entryId, n]))
-      }
+        entryMap: new Map((e.entries || []).map((n) => [n.entryId, n])),
+      },
     ])
   )
-  const updatedTimeMap = new Map(songs.map(s => [String(s._id), s.renderedAt]))
+  const updatedTimeMap = new Map(
+    songs.map((s) => [String(s._id), s.renderedAt])
+  )
   /** @type {ScoreEntry[]} */
   const scoreList = []
-  const songlist = songs.map(s => {
+  const songlist = songs.map((s) => {
     const chart = s.renderResult.selectedChart
     const entryInfo = {}
     const event = eventMap.get(s.eventId)
@@ -48,7 +46,7 @@ exports.generateSonglist = async function generateSonglist(client) {
             songId: String(s._id),
             eventId: s.eventId,
             impressions: entry.impressions,
-            total: entry.total
+            total: entry.total,
           })
         }
       }
@@ -64,17 +62,17 @@ exports.generateSonglist = async function generateSonglist(client) {
       event: s.eventId,
       updatedAt: s.renderedAt,
       weight: 1,
-      ...entryInfo
+      ...entryInfo,
     }
   })
   const weightMap = new Map()
   for (const [_eventId, scores] of Object.entries(
-    _.groupBy(scoreList, s => s.eventId)
+    _.groupBy(scoreList, (s) => s.eventId)
   )) {
     const rankScorer = createRankScorer(scores)
     const sortedRows = _.sortBy(
-      scores.map(s => ({ scoreEntry: s, score: rankScorer(s) })),
-      row => row.score
+      scores.map((s) => ({ scoreEntry: s, score: rankScorer(s) })),
+      (row) => row.score
     ).reverse()
     let currentScore = Infinity
     let currentWeight = Infinity
@@ -87,6 +85,10 @@ exports.generateSonglist = async function generateSonglist(client) {
     }
   }
   for (const song of songlist) {
+    if (song.eventId === 'bofxvii') {
+      song.weight = 100000
+      continue
+    }
     if (weightMap.has(song.songId)) {
       song.weight = weightMap.get(song.songId)
     }
@@ -108,5 +110,5 @@ exports.generateSonglist = async function generateSonglist(client) {
  * @returns {(entry: ScoreEntry) => number}
  */
 function createRankScorer(_scores) {
-  return s => s.total / s.impressions
+  return (s) => s.total / s.impressions
 }

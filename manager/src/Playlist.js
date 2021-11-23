@@ -10,19 +10,19 @@ exports.generatePlaylist = async function generatePlaylist(client, args = {}) {
     .find({
       'renderResult.uploadedAt': { $exists: true },
       disabled: { $ne: true },
-      ...filters
+      ...filters,
     })
     .toArray()
   const out = []
   out.push('#EXTM3U')
-  found.sort((a, b) => a.entryId - b.entryId)
+  found.sort((a, b) => (a.entryId || 9999) - (b.entryId || 9999))
   for (const song of found) {
     const chart = song.renderResult.selectedChart
     const entryPrefix = song.entryId ? `${song.entryId}. ` : ''
     out.push(
-      `#EXTINF:${Math.floor(chart.duration)},${entryPrefix}[${chart.info.genre}] ${
-        chart.info.artist
-      } - ${chart.info.title} #${song.eventId}`
+      `#EXTINF:${Math.floor(chart.duration)},${entryPrefix}[${
+        chart.info.genre
+      }] ${chart.info.artist} - ${chart.info.title} #${song.eventId}`
     )
     out.push(
       `${process.env.MP3_URL_PATTERN.replace(

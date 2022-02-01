@@ -14,13 +14,13 @@ fmt_length=->ts{
 
 description = "
 Now playing from <strong>#{songlist.length} tracks</strong>, totaling <strong>#{'%.2f' % [total_duration / 3600.0]} hours</strong>.
-
+<!--
 <br><br>
 
 Want to listen to a specific song? You can now request songs!
 Please go to the <a href=\"https://bmsurge-music-request.glitch.me\" target=\"_blank\"><strong>song request</strong></a>
 page for more details.
-
+-->
 <br><br>
 
 Current list of events:

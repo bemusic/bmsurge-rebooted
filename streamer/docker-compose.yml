@@ -1,3 +1,5 @@
+name: bmsurgestreamer
+
 services:
   dj:
     init: true
@@ -17,3 +19,25 @@ services:
     command: bash -c "yarn install && yarn start"
     ports:
       - 127.0.0.1:57263:57263
+  icecast:
+    image: 'moul/icecast'
+    restart: always
+    ports:
+      - 8000:8000
+    environment:
+      SHOUTER_HOST: icecast
+      SHOUTER_PORT: 8000
+      SHOUTER_USER: source
+      SHOUTER_MOUNT: be-music-surge
+      SHOUTER_NAME: Be-Music Surge
+      SHOUTER_GENRE: BMS
+      SHOUTER_BITRATE: 128
+    env_file:
+      - ./private/icecast.env
+  shouter:
+    image: 'dtinth/shouter'
+    restart: always
+    env_file:
+      - ./private/shouter.env
+    healthcheck:
+      test: 'curl -f https://be-music.spacet.me/radio/ | grep be-music-surge'

@@ -1,4 +1,4 @@
-# bmsurge-renderer/manager
+# bmsurge-rebooted/manager
 
 ## Environment variables configuration
 

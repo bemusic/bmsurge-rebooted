@@ -2,6 +2,7 @@ name: bmsurgestreamer
 
 services:
   dj:
+    restart: always
     init: true
     tmpfs: /tmp
     image: node:16

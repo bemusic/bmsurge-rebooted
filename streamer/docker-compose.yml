@@ -1,0 +1,19 @@
+services:
+  dj:
+    init: true
+    tmpfs: /tmp
+    image: node:16
+    working_dir: /app
+    volumes:
+      - ./dj:/app:ro
+      - ./private/credentials:/credentials:ro
+      - ./private/dj/node_modules:/app/node_modules
+      - ./private/dj/.yarn:/app/.yarn
+      - ./dj/.yarn/releases:/app/.yarn/releases:ro
+    env_file:
+      - ./private/dj.env
+    environment:
+      GOOGLE_APPLICATION_CREDENTIALS: /credentials/bmsurge.service-account.json
+    command: bash -c "yarn install && yarn start"
+    ports:
+      - 127.0.0.1:57263:57263

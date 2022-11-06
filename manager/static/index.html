@@ -278,7 +278,11 @@
           <tr v-for="song of songs" :key="song._id">
             <td>{{ song._id }}</td>
             <td>
-              <div style="max-width: 24em; word-wrap: break-word;">{{ song.packageFile }}</div>
+              <div style="max-width: 24em; word-wrap: break-word;">
+                <a :href="song.url">
+                  {{ song.packageFile }}
+                </a>
+              </div>
               <div v-if="song.duration != null && song.duration < 1">
                 <span class="badge badge-danger">no sound</span>
               </div>

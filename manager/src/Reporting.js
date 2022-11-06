@@ -21,7 +21,7 @@ exports.generateReport = async function generateReport(client, args) {
     .toArray()
   return {
     events,
-    songs: songs.map(s => {
+    songs: songs.map((s) => {
       const renderResult = s.renderResult
       const status =
         renderResult && renderResult.uploadedAt
@@ -46,9 +46,10 @@ exports.generateReport = async function generateReport(client, args) {
           ? renderResult.wavSizeAfterTrimEnd / (44100 * 2 * 2)
           : null,
         packageFile: decodeURIComponent(s.url.split('/').pop()),
+        url: s.url,
         selectedChart: selectedChart,
         md5s: ((renderResult && renderResult.availableCharts) || []).map(
-          c => c.md5
+          (c) => c.md5
         ),
         operationId: renderResult && renderResult.operationId,
         offset: offset,
@@ -57,11 +58,11 @@ exports.generateReport = async function generateReport(client, args) {
               const renderEvents = renderResult.events
               return [
                 renderEvents[0].time,
-                renderEvents[renderEvents.length - 1].time
+                renderEvents[renderEvents.length - 1].time,
               ]
             })()
-          : undefined
+          : undefined,
       }
-    })
+    }),
   }
 }

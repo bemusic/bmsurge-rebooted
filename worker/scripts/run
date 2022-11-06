@@ -1,6 +1,6 @@
 #!/bin/bash -e
 mkdir -p tmp/output
-docker run -ti --init --rm \
+docker run -ti --init --rm --name bmsurge-renderer \
   -p 4567:8080 \
   -v "$PWD/src:/usr/src/app/src" \
   -v "$PWD/tmp/output:/data/output" \

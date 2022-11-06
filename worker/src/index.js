@@ -162,7 +162,7 @@ async function render(
       nodir: true
     })
     for (const filePath of allFiles) {
-      if (!/\.(?:bms|bme|bml|pms|bmson|ogg|wav|mp3)/i.test(filePath)) {
+      if (!/\.(?:bms|bme|bml|pms|bmson|ogg|wav|mp3|flac)/i.test(filePath)) {
         log.debug('Removing %s', filePath)
         fs.unlinkSync(`${extractedDir}/${filePath}`)
       }

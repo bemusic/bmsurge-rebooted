@@ -219,6 +219,20 @@ to the library. This assumes that all components set up already.
       in there.
     - Run in `worker` run `./scripts/build` to build Docker image.
 
+  Some problems found when rendering:
+
+  - **FLAC keysound files:** They have seen more usage in charts for beatoraja.
+    `bms-renderer` hasn’t been updated to support them. To fix, we need to
+    convert them to WAV files.
+
+  - **Large chart files:** Bemuse has a limit of 1MB for BMS files. Some charts
+    are ridiculously larger than that. To fix, patch `bemuse-tools` to accept
+    larger file sizes.
+
+    ```
+    docker exec bmsurge-renderer sed -i.bak 's/1048576/999999999/' node_modules/bemuse-tools/lib/indexer.js
+    ```
+
 - **Adding event metadata.** I use MongoDB VS Code extension and open a MongoDB
   Playground. Then I run a MongoDB Shell script to insert new event information.
   The entries can be scraped from the venue site using

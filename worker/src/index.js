@@ -18,32 +18,32 @@ cli()
     {
       url: {
         desc: 'URL of the package to extract',
-        type: 'string'
+        type: 'string',
       },
       encoding: {
         desc: 'Input encoding',
-        type: 'string'
+        type: 'string',
       },
       output: {
         desc: 'Output MP3 file',
         type: 'string',
-        alias: ['o']
-      }
+        alias: ['o'],
+      },
     },
-    async args => {
+    async (args) => {
       /** @type {OutputDiagnostics} */
       const result = { events: [], warnings: [] }
       const log = logger('render:cli')
       await render(args.url, args.output, {
         outputDiagnostics: result,
         renderOptions: {
-          encoding: /** @type {any} */ (args.encoding)
-        }
+          encoding: /** @type {any} */ (args.encoding),
+        },
       })
       log.info({ result }, 'Finished')
     }
   )
-  .command('server', 'Starts a rendering server', {}, async args => {
+  .command('server', 'Starts a rendering server', {}, async (args) => {
     const port = +process.env.PORT || 8080
     const app = require('express')()
     const log = logger('server')
@@ -75,7 +75,7 @@ cli()
 
         await render(req.body.url, null, {
           outputDiagnostics: result,
-          renderOptions: req.body.renderOptions
+          renderOptions: req.body.renderOptions,
         })
         opLog.info({ result }, 'Render result')
         const bucketName = process.env.BMSURGE_RENDER_OUTPUT_BUCKET
@@ -83,7 +83,7 @@ cli()
           opLog.info('Uploading file')
           await storage.bucket(bucketName).upload(result.outFile, {
             destination: `${operationId}.mp3`,
-            resumable: false
+            resumable: false,
           })
           opLog.info('Uploading finish')
           eventLog(result, 'uploaded')
@@ -99,7 +99,7 @@ cli()
         next(err)
       }
     })
-    app.listen(port, function() {
+    app.listen(port, function () {
       log.info('App is listening on port', port)
     })
   })
@@ -122,7 +122,7 @@ async function render(
   outputMp3Path,
   {
     outputDiagnostics = { events: [], warnings: [] },
-    renderOptions: { encoding = 'sjis' } = {}
+    renderOptions: { encoding = 'sjis' } = {},
   } = {}
 ) {
   const log = logger('render')
@@ -140,7 +140,7 @@ async function render(
       'wget',
       [`-O${downloadedFilePath}`, '--progress=dot:mega', url],
       {
-        timeout: 120000
+        timeout: 120000,
       }
     )
     eventLog(outputDiagnostics, 'render:downloaded')
@@ -151,7 +151,7 @@ async function render(
     mkdirp.sync(extractedDir)
     await execLog('7z', ['x', downloadedFilePath], {
       timeout: 60000,
-      cwd: extractedDir
+      cwd: extractedDir,
     })
     eventLog(outputDiagnostics, 'render:extracted')
     rimraf.sync(downloadDir)
@@ -159,7 +159,7 @@ async function render(
     log.info('Removing unrelated files to save space...')
     const allFiles = glob.sync('**/*', {
       cwd: extractedDir,
-      nodir: true
+      nodir: true,
     })
     for (const filePath of allFiles) {
       if (!/\.(?:bms|bme|bml|pms|bmson|ogg|wav|mp3|flac)/i.test(filePath)) {
@@ -177,7 +177,7 @@ async function render(
     log.info('Moving chart files')
     const chartFiles = glob.sync('*.{bm[sel],pms,bmson}', {
       nocase: true,
-      cwd: extractedDir
+      cwd: extractedDir,
     })
     const reverseFilenameMap = new Map()
     for (const sourceName of chartFiles) {
@@ -185,7 +185,7 @@ async function render(
       const extname = path.extname(sourceName)
       let targetName = path.basename(sourceName)
       const fileContents = fs.readFileSync(sourceFilepath)
-      const hasBOM = b =>
+      const hasBOM = (b) =>
         (b[0] === 0xfe && b[1] === 0xff) || (b[0] === 0xff && b[1] === 0xfe)
       if (!isUtf8(fileContents) && !hasBOM(fileContents)) {
         targetName =
@@ -207,7 +207,7 @@ async function render(
       ['index'],
       {
         timeout: 30000,
-        cwd: `${workDir}/render`
+        cwd: `${workDir}/render`,
       }
     )
     eventLog(outputDiagnostics, 'render:indexed')
@@ -215,14 +215,14 @@ async function render(
     const data = JSON.parse(
       fs.readFileSync(`${workDir}/render/index.json`, 'utf8')
     )
-    const song = data.songs.find(s => s.id === 'song')
+    const song = data.songs.find((s) => s.id === 'song')
     if (!song) {
       throw new Error('No song found')
     }
-    const serializeChart = chart => ({
+    const serializeChart = (chart) => ({
       ...chart,
       file: reverseFilenameMap.get(chart.file) || chart.file,
-      fileSize: fs.statSync(`${workDir}/render/song/${chart.file}`).size
+      fileSize: fs.statSync(`${workDir}/render/song/${chart.file}`).size,
     })
     const charts = song.charts
     log.info('Found %s charts', charts.length)
@@ -243,7 +243,7 @@ async function render(
     const songMp3Path = `${workDir}/song.mp3`
     await execLog('bms-renderer', ['--full', sourceBmsPath, temporaryWavPath], {
       timeout: 300000,
-      cwd: workDir
+      cwd: workDir,
     })
     eventLog(outputDiagnostics, 'render:rendered')
     outputDiagnostics.wavSize = fs.statSync(temporaryWavPath).size
@@ -255,7 +255,7 @@ async function render(
       ['-y', temporaryWavPath],
       {
         timeout: 15000,
-        cwd: workDir
+        cwd: workDir,
       }
     )
     eventLog(outputDiagnostics, 'render:normalized')
@@ -270,7 +270,7 @@ async function render(
     const bitcrushedWavPath = `${workDir}/render16bit.wav`
     await execLog('sox', [temporaryWavPath, '-b', '16', bitcrushedWavPath], {
       cwd: workDir,
-      timeout: 30000
+      timeout: 30000,
     })
     outputDiagnostics.wavSizeBeforeTrim = fs.statSync(bitcrushedWavPath).size
     fs.unlinkSync(temporaryWavPath)
@@ -282,7 +282,7 @@ async function render(
       [bitcrushedWavPath, trimStartWavPath, 'silence', '1', '0', '0.1%'],
       {
         cwd: workDir,
-        timeout: 30000
+        timeout: 30000,
       }
     )
     outputDiagnostics.wavSizeAfterTrimStart = fs.statSync(trimStartWavPath).size
@@ -296,7 +296,7 @@ async function render(
         songWavPath,
         'reverse',
         ...['silence', '1', '0', '0.1%'],
-        'reverse'
+        'reverse',
       ],
       { cwd: workDir, timeout: 30000 }
     )
@@ -306,7 +306,7 @@ async function render(
 
     log.info('Converting to MP3...')
     await execLog('lame', ['-b320', songWavPath, songMp3Path], {
-      timeout: 60000
+      timeout: 60000,
     })
     fs.unlinkSync(songWavPath)
     eventLog(outputDiagnostics, 'render:encoded')
@@ -333,14 +333,14 @@ async function render(
 function execLog(command, args, options) {
   const process = execa(command, args, {
     stdio: ['ignore', 'pipe', 'pipe'],
-    ...options
+    ...options,
   })
   async function spawnReader(stream, log) {
     if (!stream) return
     try {
       const reader = readline.createInterface({
         input: stream,
-        crlfDelay: Infinity
+        crlfDelay: Infinity,
       })
       for await (const line of reader) {
         log.info(`> ${line}`)
@@ -366,9 +366,9 @@ async function prepareSounds(src, dest, outputDiagnostics) {
   mkdirp.sync(dest)
 
   // bmsampler requires all sounds to be stereo 44.1khz
-  const sounds = glob.sync('*.{wav,mp3,ogg}', {
+  const sounds = glob.sync('*.{wav,mp3,ogg,flac}', {
     nocase: true,
-    cwd: src
+    cwd: src,
   })
   log.info('Found %d sound file(s)', sounds.length)
   log.info('Available CPUs', require('os').cpus().length)
@@ -377,7 +377,7 @@ async function prepareSounds(src, dest, outputDiagnostics) {
   let soundsConverted = 0
   await Bluebird.map(
     sounds,
-    async sound => {
+    async (sound) => {
       const sourceFile = path.join(src, sound)
       let resultLogText = '???'
       let stderr = ''
@@ -396,7 +396,7 @@ async function prepareSounds(src, dest, outputDiagnostics) {
           '44.1k',
           '-c',
           '2',
-          path.join(dest, path.basename(sound, path.extname(sound)) + '.wav')
+          path.join(dest, path.basename(sound, path.extname(sound)) + '.wav'),
         ])
         stderr = result.stderr
         resultLogText = 'ok'
